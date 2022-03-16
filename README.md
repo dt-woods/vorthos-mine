@@ -20,5 +20,5 @@
     For example:
 
     ```sh
-    git clone https://github.com/vimux/mainroad.git themes/mainroad
+    git submodule add https://github.com/vimux/mainroad.git themes/mainroad
     ```
