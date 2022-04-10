@@ -1,4 +1,5 @@
 # vorthos-mine
+The 'Vorthos  Mine' website is built using '[blogdown][blogdown_web]', an R-based website builder based on RStudio's '[bookdown][bookdown_web]' written in markdown.
 
 ## Installation
 1. Install hugo
@@ -29,3 +30,6 @@
     ```
 
 1. Install [pandoc](https://pandoc.org/)
+
+[blogdown_web]: https://bookdown.org/yihui/blogdown/
+[bookdown_web]: https://bookdown.org/
