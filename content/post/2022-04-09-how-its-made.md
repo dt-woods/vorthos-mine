@@ -1,0 +1,14 @@
+---
+title: How It's Made
+description: A behind-the-scenes look at the development of a web-blog.
+date: 2022-04-09
+authorbox: false
+slug: origin
+categories:
+  - "Development"
+tags:
+  - "History"
+---
+
+What's better than a DIY blog?
+<!--more-->

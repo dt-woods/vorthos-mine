@@ -22,3 +22,10 @@
     ```sh
     git submodule add https://github.com/vimux/mainroad.git themes/mainroad
     ```
+1. Download the blogdown R-package (e.g., version 1.9)
+
+    ```r
+    > install.packages("blogdown")
+    ```
+
+1. Install [pandoc](https://pandoc.org/)
