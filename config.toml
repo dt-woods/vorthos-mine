@@ -26,7 +26,7 @@ post_meta = ["date", "categories"]
 mainSections = ["post", "docs"]
 
 [Params.logo]
-image = "img/logo.png"
+image = "logo.png"
 subtitle = "Alternative EDH deckbuilding"
 
 [Params.sidebar]
