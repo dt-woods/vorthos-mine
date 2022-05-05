@@ -31,5 +31,14 @@ The 'Vorthos  Mine' website is built using '[blogdown][blogdown_web]', an R-base
 
 1. Install [pandoc](https://pandoc.org/)
 
+For clones of this repository, remember to run the following:
+
+```sh
+git submodule init
+git submodule update
+```
+
+in order to get the 'mainroads' theme copied to the repo.
+
 [blogdown_web]: https://bookdown.org/yihui/blogdown/
 [bookdown_web]: https://bookdown.org/
