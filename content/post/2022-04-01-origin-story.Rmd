@@ -1,9 +1,9 @@
 ---
-title: Origin Story
-description: A look at how this project got started.
+title: "Origin Story"
+description: "A look at how this project got started."
 date: 2022-04-01
 authorbox: false
-slug: origin
+slug: "origin"
 categories:
   - "Development"
 tags:
