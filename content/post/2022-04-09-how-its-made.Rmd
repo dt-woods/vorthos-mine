@@ -3,7 +3,7 @@ title: "How It's Made"
 description: "A behind-the-scenes look at the development of a web-blog."
 date: 2022-04-09
 authorbox: false
-slug: "origin"
+slug: "how-its-made"
 categories:
   - "Development"
 tags:
