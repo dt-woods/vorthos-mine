@@ -7,3 +7,12 @@ menu: "main"
 ---
 
 Welcome to the Vorthos Mine!
+
+The Vorthos Mine is a video and web log series created by Tyler W. Davis that reviews, discusses, and analyzes the alternative deck-building strategy of the Vorthos player for the Commander/EDH format of _Magic: The Gathering_ collectible card game.
+
+For more information on _Magic: The Gathering_, check out Wizards of the Coast .
+
+**What is Commander?**
+
+As described by [Wizards of the Coast](https://magic.wizards.com), Commander is a casual, multiplayer format, where you choose a legendary creature to serve as your general and build the rest of your deck around your general's color identity.
+Your deck is allowed only one of each card with the exception of basic lands utilizing cards from throughout the games long history.
