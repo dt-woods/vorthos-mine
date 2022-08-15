@@ -1,4 +1,4 @@
-baseURL = "https://vorthos-mine.online/"
+baseURL = "https://vorthosmine.online/"
 languageCode = "en-us"
 title = "Vorthos Mine"
 theme = "mainroad"
@@ -13,7 +13,7 @@ ignoreFiles = [
 [Author]
 name = "Tyler W. Davis"
 bio = "Engineer, educator, dream weaver, plus coder."
-avatar = "img/danger.png"
+avatar = "danger.png"
 
 [Params]
 description = "Alternative deck building for Magic: The Gathering"

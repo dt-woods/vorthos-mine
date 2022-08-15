@@ -1,0 +1,69 @@
+---
+title: "How It's Made: Logo"
+description: "Paying for clip art."
+date: 2022-08-15
+authorbox: false
+slug: "how-its-made-logo"
+categories:
+  - "How It's Made"
+tags:
+  - "Development"
+  - "DIY"
+  - "Logo"
+---
+
+Imagery fills the mood.
+<!--more-->
+
+Building on the idea of _Vorthos Mine_ being an actual mine---an extraction of raw materials from the earth---I liked the idea of making logo into a mineral.
+As with natural minerals, they can be made up of many elements: just like Magic: The Gathering is made of five key colors!
+
+With this idea in mind, I went... to the internet!
+
+To be honest, I lost a lot of time scrolling through free images on the web.
+I've done it before and I'm likely to do it again.
+However, this blog was meant to be a quick outlet that fills a niche in the Commander world of MTG.
+
+That being said, I gave up on the endless scroll.
+There must be a better way.
+
+Back... to the internet!
+
+The internet showed me that companies provide assets, such as company logos with custom color pallets.
+
+I randomly chose [Looka](https://looka.com) thanks to it showing up as a recommended resource.
+The site allowed me to quickly create an account, search images (e.g., "gem") and put it into a template, which ended up looking like this:
+
+![](/img/looka_logo_2022.png 'Vorthos Mine Logo - https://looka.com/s/86830218')
+
+See more of the asset [here](https://looka.com/s/86830218).
+
+I was thrilled.
+PayPal to the rescue and high-quality PNG files were at my disposal.
+
+Next, I wanted to add color to my gem.
+To make it MTG-related, I went... back to the internet!
+
+A web search quickly identified the color pie.
+The most common format was something similar to this (from [Fandom Wiki](https://mtg.fandom.com/wiki/Magic:_The_Gathering)):
+
+![](https://images.wikia.com/mtgsalvation_gamepedia/images/thumb/e/e1/Color_Wheel.jpg/350px-Color_Wheel.jpg 'Color Wheel - https://mtg.fandom.com/wiki/Magic:_The_Gathering')
+
+I downloaded a version of this image and used the GNU Image Manipulation Program ([GiMP](https://www.gimp.org/)) to extract the HTML color codes.
+Unfortunately, the colors were a bit dark, so lightened them manually and ended up with the following:
+
+- W: fcc637
+- U: 0078ac
+- B: 3e3d39
+- R: bc012a
+- G: 50c878
+
+The last challenge I ran into was the fact that despite having a high quality PNG image, the export included gradients of grayscale and non-closing regions within the gem.
+It was back to GiMP to manually fix the coloring using both the eraser tool and the paintbrush to get edge-to-edge coloring.
+I decided to leave the gaps (where the red and blue bleed across facets in the middle of the gem).
+I think it gives it a little more personality.
+
+To get the image to show up in Mainroad theme of blogdown, I cropped the image to just the gem, set the background of the PNG to transparent, and scaled the logo to 190x564 pixels.
+The logo shows up next to the Mainroads theme title and sub-title, which brings the whole thing together.
+
+Well, there you have it.

@@ -1,16 +1,20 @@
 ---
-title: "How It's Made"
-description: "A behind-the-scenes look at the development of a web-blog."
+title: "How It's Made: Theme music"
+description: "Music sets the scene."
 date: 2022-04-09
 authorbox: false
-slug: "how-its-made"
+slug: "how-its-made-theme-music"
 categories:
-  - "Development"
+  - "How It's Made"
 tags:
-  - "History"
+  - "Development"
+  - "DIY"
+  - "Music"
 ---
 
-What's better than a DIY blog?
+Music sets the scene.
 <!--more-->
 
-Let me tell you!
+Some may say that music is the most powerful form of magic.
+
+For the video web log, I wanted an intro that captures the essence of the blog.
