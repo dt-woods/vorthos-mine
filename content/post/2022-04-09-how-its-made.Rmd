@@ -12,9 +12,88 @@ tags:
   - "Music"
 ---
 
-Music sets the scene.
+"_Just 'cause it's the theme song, don't make it not true._"
 <!--more-->
 
 Some may say that music is the most powerful form of magic.
 
-For the video web log, I wanted an intro that captures the essence of the blog.
+For the vlog, I wanted an intro that really captures the theme.
+A long, long time ago, a friend and I composed some music to an old German poem, called Erlk&ouml;nig by Johann Wolfgang von Goethe and it became something of an epic.
+Pulling the intro music from that song, I was able to get an atmospheric and slightly intense soundtrack.
+Next, I needed some quotes to help define the theme.
+Based on the title I gave the blog, _Vorthos Mine_, which was a sort of play on [_Enemy Mine_](https://www.imdb.com/title/tt0089092/) (1985) (a strongly thematic film), I searched for film quotes that met two criteria:
+
+1. it needs to include the word "mine"
+2. it needs to be a film that I recognize (and like).
+
+I brainstormed a bit and came up with:
+
+1. "Your soul is mine!" from [Mortal Kombat](https://www.imdb.com/title/tt0113855/) (1995)
+1. "And they call it a mine!" from [The Lord of the Rings: The Fellowship of the Ring](https://www.imdb.com/title/tt0120737/) (2001)
+
+For a 30 second intro, I knew I needed more, so
+
+To the internet!
+
+I came across this resource, [QuoDB](https://www.quodb.com/), which turned out to be quite useful.
+You can search across millions of movies for a single word or phrase and filter search results by genre.
+
+What luck!
+
+A few evenings later and I came up with a much longer list:
+
+1. "Victory is mine!" --- [Monty Python and the Holy Grail](https://www.imdb.com/title/tt0071853/) (1975)
+1. "A young Jedi named Darth Vader and was a pupil of mine" --- [Star Wars](https://www.imdb.com/title/tt0076759/) (1977)
+1. "You do your job. Don't tell me how to do mine." --- [Ghostbusters](https://www.imdb.com/title/tt0087332/) (1984)
+1. "... by the abandoned silver mine." --- [Back to the Future: Part III](https://www.imdb.com/title/tt0099088/) (1990)
+1. "And more violence last night on Mars where terrorists demanding independence once again halted the extraction of terminium ore. Quato and his so-called freedom brigade claimed credit for this latest bombing, which attempted to reopen the sealed off Pyramid Mine" --- [Total Recall](https://www.imdb.com/title/tt0100802/) (1990)
+1. "It's no good. Let me try mine." --- [Terminator 2: Judgement Day](https://www.imdb.com/title/tt0103064/) (1991)
+1. "You tell me your name and I'll tell you mine." --- [Scream](https://www.imdb.com/title/tt0117571/) (1996)
+1. "This is mine." --- [X-Men](https://www.imdb.com/title/tt0120903/) (2000)
+1. "It's mine!" --- [Harry Potter and the Sorcerer's Stone](https://www.imdb.com/title/tt0241527/) (2001)
+1. "The pleasure is mine." --- [Sherlock Holmes](https://www.imdb.com/title/tt0988045/) (2009)
+1. "Revenge is mine." --- [Transformers: Revenge of the Fallen](https://www.imdb.com/title/tt1055369/) (2009)
+
+Suddenly, there was way too many!
+
+A good way to filter this list was to see if I could actually get the audio from these films.
+So once again...
+
+To the internet!
+
+I searched YouTube for what I could find of the clips mentioned above.
+A nice thing about QuoDB is that it provides the time stamp for when during the film the quote was taken.
+
+Now with a set of YouTube links, I needed a way to scrub audio.
+
+To the internet!
+
+I came across, [youtube-dl](https://ytdl-org.github.io/youtube-dl/), a command line interface tool that runs in Python and can download audio and/or video from public YouTube links.
+
+Perfect!
+
+The command-line takes options, of which, the notable ones I used were the post-processing options
+
+- `-x` to extract audio
+- `--audio-format mp3` to get .mp3
+- `--audio-quality 192K` to get the same bitrate
+
+I still didn't have the title line, so I turned once again
+
+To the internet!
+
+I came across the [CMU Flite](http://www.festvox.org/flite/) (festival lite) speech synthesis software a few years ago when I made my own audio book.
+In my opinion, it's a great little piece of software and I found another project to use it in.
+It turns out that you can send text strings directly to the command-line tool and save the output to an audio file (.wav).
+I tested a few different voices and landed on KAL.
+
+Now, I have all my ingredients.
+Next, it was blending it all together with [Audacity](https://www.audacityteam.org/).
+
+A lot of hours went into filtering out noise, playing with levels, and cutting sound clips... I'm looking at you Total Recall... before I managed to get everything down to a 30-second clip.
+
+Here it is!
+
+<audio controls>
+<source src="/aud/vm_intro_v2.mp3">
+</audio>

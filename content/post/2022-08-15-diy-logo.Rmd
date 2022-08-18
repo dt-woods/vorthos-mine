@@ -12,7 +12,7 @@ tags:
   - "Logo"
 ---
 
-Imagery fills the mood.
+"_I've seen the logo before..._"
 <!--more-->
 
 Building on the idea of _Vorthos Mine_ being an actual mine---an extraction of raw materials from the earth---I liked the idea of making logo into a mineral.
