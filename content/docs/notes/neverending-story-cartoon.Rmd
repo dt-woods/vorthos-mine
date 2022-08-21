@@ -1,0 +1,68 @@
+---
+title: "The Neverending Story Cartoon Notes"
+description: "Show notes taken while watching The Neverending Story cartoon."
+draft: true
+tags:
+  - "Story Notes"
+  - "Research"
+---
+
+[The Neverending Story][nes_cartoon] cartoon is a 26-episode series originally released in Canada in the mid 90s (by CineVox Entertainment), starring [Christopher Bell][imdb_c_bell] as the voice actor for Bastion Bux.
+<!--more-->
+
+There are some interesting ideas used throughout the show.
+A few are noted here:
+
+- Mr. Coreander never appears in character, only as a voice or is mentioned by other characters.
+- The end of each episode utilizes the book's "and they went on to have many other adventures, but that's another story."
+
+---
+
+# Episode Summaries
+
+## Episode 1 - The Tears of Sadness
+Xyede poisons the Fountain of Life with the tears of the Acharis (human-sized zombie worms), but Barktroll uses a happy potion to reverse their sadness and turn them into Schlamoofs (i.e., the happiest creatures in Fantasia).
+
+We are introduced to:
+
+- Barktroll, a weird tree monster and side-kick of Bastion's
+- Bighead (a replacement for Cairon, herald of the Childlike Empress)
+- The Childlike Empress
+- Engywook, the scientist
+- Urgl, the potions master
+- Xyede, the queen of emptiness
+- Arachis, the worms whose tears make the Silver Sea
+
+## Episode 2 - The Meek and the Mighty
+Junior Rockchewer gets lost in the caves of Fantasia and Bastion and Gluckuk are sent in to the rescue.
+
+We are introduced to:
+
+- Gluckuk, the tiny and his racing snail
+- Rockchewer (i.e., Pyornkrachzark, the rock biter) and family
+
+## Episode 3 - The Purple Buffalo
+Xyede plans to turn all the purple buffalo into giant locusts that will eat the grassy ocean in her effort to destroy Fantasia, but Bastion follows the advice of the Great Buffalo Spirit to counter her evil deeds.
+
+> "The Horn of Gatylon, free the buffalo, use the powder, where there is life, there is always hope." -- The Great Buffalo Spirit
+
+We are introduced to:
+
+- Atreyu, the Greenskin warrior
+
+## Episode 4 - Morla's Wish
+Bastion takes Morla a wish box for her birthday from the Childlike Empress.
+
+We learn that Morla is female.
+
+We are introduced to:
+
+- Jack-o (the birdman)
+- Mud monsters
+- Traitor of trinkets, treasures, and persons (shadow goblin)
+- G'mork (wolfman)
+- Morla, the ancient one
+
+
+[imdb_c_bell]: https://www.imdb.com/name/nm0068110/
+[nes_cartoon]: https://en.wikipedia.org/wiki/The_Neverending_Story_(TV_series)

@@ -1,0 +1,45 @@
+---
+title: "The Lord of the Rings Notes"
+description: "Notes taken while reading The Lord of the Rings."
+draft: true
+tags:
+  - "Story Notes"
+  - "Research"
+---
+
+[The Lord of the Rings][lotr_wp] is a three-volume, six-book epic story by J.R.R. Tolkien published in the mid 1950s that tells the events leading up to and immediately following the War of the Ring and the end of the Third Age of Middle Earth.
+<!--more-->
+
+Bilbo's song of E&auml;rendil at Rivendell (Lord of the Rings, volume 1, book 2, chapter 1, "Many meetings"), mentions the following:
+
+- valiant sword
+- winds of wrath
+- emerald, diamond
+- otherworldly light
+
+The story of the ring as told at the Council of Elrond, through the Mines of Moria and into Lothl&oacute;rien mentions the following:
+
+- Aiglos, the Spear of Gil-galad
+- Narsil, the Sword of Elendil
+- Osgiliath, Citadel of the Stars
+- Minas Ithil, Tower of the Rising Moon
+    * now Minas Morgul, Tower of Sorcery
+- Minas Arnor, Tower of the Setting Sun
+    * now Minas Tirith, Tower of Guard
+- Gwaihir the Windlord, swiftest of the Great Eagles
+- Orthanc, the tower of Isengard
+- The Rohirrim, the Horse-lords of the Riddermark
+- Tom Bombadil (aka Iarwain Ben-adar, Forn, and Orald)
+- Glamdring and Orcrist (evish swords known as _Beater_ and _Biter_)
+- Miruvor, cordial of Imladris, a warm and fragrant liquor to strengthen the heart and reinvigorate the limbs
+- "_naur an edraith ammen!_" --- Gandalf's green and blue flame spell
+    * Gandalf's shutting spell
+    * The word of Command that breaks the door and collapses the cave
+- Lord Celeborn and Lady Galadriel of L&oacute;rien
+- Galadhrim, the tree people of Lothl&oacute;rien
+- Mallorn trees, which not idly do the leaves of L&oacute;rien fall
+- Nenya, the Ring of Adamant, one of the three rings given to the elves, with Galadriel as its protector
+
+
+
+[lotr_wp]: https://en.wikipedia.org/wiki/The_Lord_of_the_Rings
