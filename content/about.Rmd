@@ -8,11 +8,29 @@ menu: "main"
 
 Welcome to the Vorthos Mine!
 
-The Vorthos Mine is a video and web log series created by Tyler W. Davis that reviews, discusses, and analyzes the alternative deck-building strategy of the Vorthos player for the Commander/EDH format of _Magic: The Gathering_ collectible card game.
+The Vorthos Mine is a video and web log series created by Tyler W. Davis in 2022 that reviews, discusses, and analyzes the alternative deck-building strategy of the Vorthos player for the Commander/EDH format of _Magic: The Gathering_ collectible card game.
 
-For more information on _Magic: The Gathering_, check out Wizards of the Coast .
-
-**What is Commander?**
+## What is Commander?
 
 As described by [Wizards of the Coast](https://magic.wizards.com), Commander is a casual, multiplayer format, where you choose a legendary creature to serve as your general and build the rest of your deck around your general's color identity.
 Your deck is allowed only one of each card with the exception of basic lands utilizing cards from throughout the games long history.
+
+## What is Vorthos?
+
+Vorthos is described ([here][mtg_wotc_150831]) by Mark Rosewater, head designer for _Magic: The Gathering_ at Wizards of the Coast, not as a psychographic profile (such as the Timmy/Tammy or the Spike), but as an aesthetic profile that helps define what a player cares about rather than why they like to do what they do.
+When it comes to aesthetics, Rosewater has lumped players into one of two categories:
+
+1. the Vorthos player, and
+2. the Mel.
+
+Mel is a player with an eye for the beauty of game mechanics (e.g., type, attribute, and ability interactions and how they tie in to or break apart the color pie).
+
+The Vorthos player, on the other hand, is the player who cares about the beauty of card flavor.
+Because we don't actually eat the cards, flavor comes from our other senses, such as how the card art looks, how the card name sounds, how the flavor text reads, and the overall feeling you get from having a card that helps theme your deck.
+
+So here we are in the Vorthos Mine---players who care about theme---while still reserving the right to be a Johnny/Jenny, Timmy/Tammy, or a Spikey player.
+
+Myself, as a deck builder (sometimes referred to as a brewer), I was drawn out of Standard gameplay and into Commander mostly because of card availability---both on the spectrum of what cards are available to play with and how much they cost to obtain.
+Additionally, the extra-large 100-card deck and the restrictions of a singleton format provided an excellent sandbox for deck-building design.
+
+[mtg_wotc_150831]: https://magic.wizards.com/en/articles/archive/making-magic/vorthos-and-mel-2015-08-31
