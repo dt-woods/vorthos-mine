@@ -1,0 +1,27 @@
+.title-with-glyph {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+}
+.title-with-glyph > h1 {
+  display: inline;
+}
+
+.glyph {
+  background-repeat: no-repeat;
+  background-size: 3.6rem 3.6rem;
+  height: 3.6rem;
+  width:3.6rem;
+  margin:1.6 3.2 1.6 0;
+}
+
+#nes-glyph {
+  background-image: url('../img/nes-auryn-light.svg');
+}
+
+@media (prefers-color-scheme: dark) {
+  #nes-glyph {
+    background-image: url('../img/nes-auryn-dark.svg');
+  }
+}
