@@ -46,9 +46,20 @@ The 'Vorthos  Mine' website is built using '[blogdown][blogdown_web]', an R-base
     ```
 
     ```r
-    blogdown::build_site() 
+    blogdown::build_site()
     ```
 
 
 [blogdown_web]: https://bookdown.org/yihui/blogdown/
 [bookdown_web]: https://bookdown.org/
+
+
+---
+
+# Appendix
+
+CSV color scheme:
+
+- Main (metallic gold): d4af37
+- Accent-1 (metallic sunburst): 9c7c38
+- Accent-2 (pearl): eae0c8
