@@ -11,32 +11,131 @@
         <!-- Inspired by CodePen, source: https://css.winterveil.net/ -->
         <link rel="stylesheet" href="https://unpkg.com/normalize.css">
         <link rel="stylesheet" href="https://unpkg.com/magick.css">
+        <!-- Homebrew styles; remember to update version! -->
+        <link rel="stylesheet" href="css/styles.css?v=0.1" media="none" onload="if(media!='all')media='all'">
 
     </head>
     <body>
+
+        <!--[if lt IE 8]>
+            <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="https://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
+        <![endif]-->
+
         <main>
             <header>
                 <h1>The Vorthos Mine</h1>
                 <p style="text-align: center; margin-top:-2.3rem; margin-bottom:-0.2rem; margin-left:-15rem; font-size: 1.4rem">by Dr. D.</p>
                 <nav>
                     <ul>
-                        <li><a href="the-neverending-story.html"><img src="img/ouroboros.svg" style="width:2.3rem; margin:0 0 -0.4rem 0; cursor:pointer;" title="The Neverending Story" alt="The Neverending Story"></a></li>
-                        <li><a href="#"><img src="img/lord-of-the-rings.svg" style="width:2.3rem; margin:0 0 -0.4rem 0;" title="The Lord of the Rings" alt="The Lord of the Rings"></a></li>
-                        <li><a href="#"><img src="img/baphomet-seal.svg" style="width:2.3rem; margin:0 0 -0.4rem 0;" title="Legend" alt="Legend"></a></li>
-                        <li><a href="#"><img src="img/deathly-hallows.svg" style="width:2.3rem; margin:0 0 -0.4rem 0;" title="Harry Potter" alt="Harry Potter"></a></li>
+                        <li>
+                            <a href="#" id="li-vm"><img src="img/vorthos.svg" style="height:2.3rem; margin:0 0 -0.4rem 0; cursor:pointer;" title="The Vorthos Mine" alt="The Vorthos Mine"></a>
+                        </li>
+                        <li>
+                            <a href="#" id="li-nes"><img src="img/ouroboros.svg" style="height:2.3rem; margin:0 0 -0.4rem 0; cursor:pointer;" title="The Neverending Story" alt="The Neverending Story"></a>
+                        </li>
+                        <li>
+                            <a href="#" id="li-lotr"><img src="img/lord-of-the-rings.svg" style="height:2.3rem; margin:0 0 -0.4rem 0;" title="The Lord of the Rings" alt="The Lord of the Rings"></a>
+                        </li>
+                        <li>
+                            <a href="#" id="li-lgd"><img src="img/baphomet-seal.svg" style="height:2.3rem; margin:0 0 -0.4rem 0;" title="Legend" alt="Legend"></a>
+                        </li>
+                        <li>
+                            <a href="#" id="li-hp"><img src="img/deathly-hallows.svg" style="height:2.3rem; margin:0 0 -0.4rem 0;" title="Harry Potter" alt="Harry Potter"></a>
+                        </li>
                     </ul>
                   </nav>
             </header>
-            <section id="About">
-                <p>
-                    Buried under the recesses of time are the hidden gems of
-                    the Vorthos Mine.
-                    Join me on my quest to uncover these priceless artefacts of alternative Commander deckbuilding for <em>Magic: The Gathering</em>.
-                </p>
+
+            <!-- Vorthos Mine -->
+            <section id="VM">
+
+                <div>
+                    <p>
+                        Buried under the recesses of time are the hidden gems of
+                        the Vorthos Mine.
+                        Join me on my quest to uncover these priceless artefacts of alternative Commander deckbuilding for <em>Magic: The Gathering</em>.
+                    </p>
+                </div>
+
             </section>
+
+            <!-- The Neverending Story -->
+            <section id="NES">
+
+                <div class="title-with-glyph">
+                    <!-- CSS the hot-swap of light/dark mode SVG -->
+                    <div class="glyph" id="nes-glyph"></div>
+                    <h1>The Neverending Story</h1>
+                </div>
+
+            </section>
+
             <footer>
                 <hr>
             </footer>
         </main>
+
+        <script>
+            // Hide/show but maintain the spacing.
+            const show = elem => {
+                elem.style.visibility = 'visible'
+            }
+            const hide = elem => {
+                elem.style.visibility = 'hidden'
+            }
+            const toggleHide = elem => {
+                // if the element is visible, hide it
+                if (window.getComputedStyle(elem).visibility !== 'hidden') {
+                    hide(elem)
+                    return
+                }
+
+                // show the element
+                show(elem)
+            }
+
+            // Hide/show, which removes the element
+            const rm = elem => {
+                elem.style.display = 'none'
+            }
+            const mk = elem => {
+                elem.style.display = 'block'
+            }
+            const toggleDisplay = elem => {
+                // if the element is visible, hide it
+                if (window.getComputedStyle(elem).display !== 'none') {
+                    rm(elem)
+                    return
+                }
+
+                // show the element
+                mk(elem)
+            }
+
+            // Set the original state of elements
+            hide(document.querySelector('#VM'))
+            rm(document.querySelector('#NES'))
+
+            // Event listeners to navigation links
+            document.getElementById('li-vm').addEventListener(
+                'click',
+                function (e) {
+                    // Add section back to DOM; remove others, toggle vis.
+                    mk(document.querySelector('#VM'));
+                    rm(document.querySelector('#NES'));
+                    toggleHide(document.querySelector('#VM'));
+                }
+            );
+            document.getElementById('li-nes').addEventListener(
+                'click',
+                function (e) {
+                    // Remove welcome text, toggle vis.
+                    hide(document.querySelector('#VM'));
+                    rm(document.querySelector('#VM'));
+                    toggleDisplay(document.querySelector('#NES'));
+                }
+            );
+
+        </script>
     </body>
 </html>
