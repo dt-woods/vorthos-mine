@@ -1,104 +1,146 @@
+#include "NoteDecoder.h" // Include your NoteDecoder class
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <sndfile.h>
-#include <stdexcept>
 
-// Looping function
-std::vector<float> generate_audio(const std::vector<float> &sample_data, double sample_rate, double desired_duration)
+// HOW TO COMPILE:
+// g++ mc.cpp NoteDecoder.cpp -o mml_test -lsndfile -std=c++17
+
+// Helper to write raw PCM data (same as before)
+void write_pcm_file(const std::string &filename, const std::vector<float> &audio_data)
 {
-    std::vector<float> output_audio;
-    double sample_length_seconds = static_cast<double>(sample_data.size()) / sample_rate;
-
-    if (desired_duration <= 0)
+    std::ofstream outfile(filename, std::ios::binary);
+    if (!outfile)
     {
-        return output_audio; // Return empty if no duration or negative duration
+        std::cerr << "Error opening output file: " << filename << std::endl;
+        return;
     }
-
-    if (desired_duration <= sample_length_seconds)
-    {
-        // If the desired duration is shorter than the sample, we take a segment
-        size_t num_samples_to_take = static_cast<size_t>(desired_duration * sample_rate);
-        output_audio.insert(output_audio.end(), sample_data.begin(), sample_data.begin() + num_samples_to_take);
-    }
-    else
-    {
-        // If the desired duration is longer, we loop the sample
-        double num_loops_exact = desired_duration / sample_length_seconds;
-        size_t num_full_loops = static_cast<size_t>(num_loops_exact);
-        double remaining_duration = desired_duration - (num_full_loops * sample_length_seconds);
-        size_t num_remaining_samples = static_cast<size_t>(remaining_duration * sample_rate);
-
-        // Add the full loops
-        for (size_t i = 0; i < num_full_loops; ++i)
-        {
-            output_audio.insert(output_audio.end(), sample_data.begin(), sample_data.end());
-        }
-
-        // Add the remaining part of the sample (if any)
-        if (num_remaining_samples > 0)
-        {
-            output_audio.insert(output_audio.end(), sample_data.begin(), sample_data.begin() + num_remaining_samples);
-        }
-    }
-
-    return output_audio;
+    outfile.write(reinterpret_cast<const char *>(audio_data.data()), audio_data.size() * sizeof(float));
+    outfile.close();
+    std::cout << "Audio data written to " << filename << " (raw float)." << std::endl;
 }
-
 
 int main()
 {
-    const char *input_filename = "A4-sqr.wav";
-    const char *output_filename = "sine_wave.pcm"; // Still using this name
+    // IMPORTANT: Replace with the actual base path to your waveform library!
+    // Example: "/home/user/my_waveforms" or "C:/Users/User/Documents/Waveforms"
+    const std::string waveformLibraryPath = "/home/user/Dropbox/Music/waveform_library";
 
-    SNDFILE *infile = nullptr;
-    SF_INFO sfinfo;
+    // Output PCM file name
+    const std::string outputPcmFile = "test_output.pcm";
 
-    // Open the input WAV file
-    infile = sf_open(input_filename, SFM_READ, &sfinfo);
-    if (!infile)
+    // Overall audio data that will be written to PCM
+    std::vector<float> final_audio_output;
+
+    try
     {
-        std::cerr << "Error opening input file: " << input_filename << " - " << sf_strerror(nullptr) << std::endl;
+        NoteDecoder decoder(waveformLibraryPath);
+
+        // --- Test 1: A4 square wave, 2 seconds, explicit duration ---
+        std::cout << "\n--- Testing A4 Square Wave (2s explicit) ---" << std::endl;
+        std::vector<float> sqr_a4_audio = decoder.getNoteAudio(
+            "sqr", // folderAbbr
+            "A",   // noteName
+            ' ',   // accidental (natural)
+            4,     // length (quarter note - though explicit duration overrides)
+            4,     // octave (4)
+            2.0,   // explicitDurationSeconds (2 seconds)
+            120.0  // currentTempoBPM
+        );
+
+        if (!sqr_a4_audio.empty())
+        {
+            std::cout << "Generated A4 square wave audio size: " << sqr_a4_audio.size() << " samples." << std::endl;
+            final_audio_output.insert(final_audio_output.end(), sqr_a4_audio.begin(), sqr_a4_audio.end());
+        }
+        else
+        {
+            std::cerr << "Failed to generate A4 square wave audio." << std::endl;
+        }
+
+        // --- Test 2: Snare drum, natural duration (no explicit length/duration) ---
+        // Add some silence between notes for clarity
+        int commonSampleRate = decoder.getLoadedSampleRate();
+        size_t silence_samples_1s = commonSampleRate; // For 1 s of silence at this rate
+        if (silence_samples_1s > 0)
+        {
+            final_audio_output.insert(final_audio_output.end(), silence_samples_1s, 0.0f);
+            std::cout << "\n--- Adding 1 second of silence ---" << std::endl;
+        }
+
+        std::cout << "\n--- Testing Snare Drum (natural duration) ---" << std::endl;
+        std::vector<float> snare_audio = decoder.getNoteAudio(
+            "X",       // folderAbbr (for casio-drums)
+            "snare01", // noteName (style + variant)
+            ' ',       // accidental (ignored for drums)
+            0,         // length (0, so it uses natural duration)
+            0,         // octave (ignored for drums)
+            0.0,       // explicitDurationSeconds (0.0, so it uses natural duration)
+            120.0      // currentTempoBPM (ignored for natural duration)
+        );
+
+        if (!snare_audio.empty())
+        {
+            std::cout << "Generated Snare audio size: " << snare_audio.size() << " samples." << std::endl;
+            final_audio_output.insert(final_audio_output.end(), snare_audio.begin(), snare_audio.end());
+        }
+        else
+        {
+            std::cerr << "Failed to generate Snare audio." << std::endl;
+        }
+
+        // --- Test 3: Cb5 Triangle wave (should map to B5.wav), 1.5 seconds, derived from length ---
+        // Add some silence between notes for clarity
+        if (silence_samples_1s > 0)
+        {
+            final_audio_output.insert(final_audio_output.end(), silence_samples_1s, 0.0f);
+            std::cout << "\n--- Adding 1 second of silence ---" << std::endl;
+        }
+
+        std::cout << "\n--- Testing Cb5 Triangle Wave (1.5s derived from length) ---" << std::endl;
+        // Tempo 60 BPM: quarter note = 1 second. Half note (length 2) = 2 seconds.
+        // So, 1.5 seconds is 1.5 * (1/4) = 0.375 of a whole note.
+        // This is a bit tricky to map exactly to standard lengths, so we'll use a length
+        // that results in roughly 1.5s at 60 BPM, or just note that the calculation
+        // will give us 1.5s if currentTempoBPM and length were adjusted.
+        // Let's target 1.5 seconds by using length 4 (quarter note) at 40 BPM (60/40 * 4/4 = 1.5s)
+        std::vector<float> tri_cb5_audio = decoder.getNoteAudio(
+            "tri", // folderAbbr
+            "C",   // noteName
+            '-',   // accidental (flat)
+            4,     // length (quarter note)
+            5,     // octave (5)
+            0.0,   // explicitDurationSeconds (0.0, so it uses length)
+            40.0   // currentTempoBPM (set to 40 for 1.5s quarter note)
+        );
+
+        if (!tri_cb5_audio.empty())
+        {
+            std::cout << "Generated Cb5 triangle wave audio size: " << tri_cb5_audio.size() << " samples." << std::endl;
+            final_audio_output.insert(final_audio_output.end(), tri_cb5_audio.begin(), tri_cb5_audio.end());
+        }
+        else
+        {
+            std::cerr << "Failed to generate Cb5 triangle wave audio." << std::endl;
+        }
+
+        // 4. Write the combined audio to PCM file
+        if (!final_audio_output.empty())
+        {
+            write_pcm_file(outputPcmFile, final_audio_output);
+            std::cout << "\nPlayback Info for FFmpeg/VLC (assuming 44100 Hz, 1 channel from your samples):" << std::endl;
+            std::cout << "  ffmpeg -f f32le -ar 44100 -ac 1 -i " << outputPcmFile << " output.mp3" << std::endl;
+        }
+        else
+        {
+            std::cerr << "No audio generated for output." << std::endl;
+        }
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "An unhandled error occurred: " << e.what() << std::endl;
         return 1;
     }
-
-    // Print some info about the WAV file
-    std::cout << "Opened input file: " << input_filename << std::endl;
-    std::cout << "  Sample rate: " << sfinfo.samplerate << std::endl;
-    std::cout << "  Channels: " << sfinfo.channels << std::endl;
-    std::cout << "  Frames: " << sfinfo.frames << std::endl;
-    std::cout << "  Format: 0x" << std::hex << sfinfo.format << std::dec << std::endl;
-
-    // Read all frames from the WAV file into a buffer
-    std::vector<float> sample_data(sfinfo.frames * sfinfo.channels);
-    sf_count_t frames_read = sf_read_float(infile, sample_data.data(), sample_data.size());
-    if (frames_read != sfinfo.frames)
-    {
-        std::cerr << "Warning: Could not read all frames from input file." << std::endl;
-    }
-
-    // Close the input file
-    sf_close(infile);
-
-    // Define the desired duration (5 seconds)
-    double desired_duration = 5.0;
-
-    // Generate the audio data for the desired duration by looping
-    std::vector<float> output_audio = generate_audio(sample_data, static_cast<double>(sfinfo.samplerate), desired_duration);
-
-    // Open the output PCM file
-    std::ofstream outfile(output_filename, std::ios::binary);
-    if (!outfile)
-    {
-        std::cerr << "Error opening output file: " << output_filename << std::endl;
-        return 1;
-    }
-
-    // Write the generated audio data to the PCM file
-    outfile.write(reinterpret_cast<const char *>(output_audio.data()), output_audio.size() * sizeof(float));
-
-    outfile.close();
-    std::cout << "Looped audio data (5 seconds) written to " << output_filename << " (raw float)." << std::endl;
 
     return 0;
 }
