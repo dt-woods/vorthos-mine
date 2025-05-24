@@ -16,9 +16,10 @@ enum class CommandType
 {
     NOTE,
     TEMPO,
-    OCTAVE, // <--- ADD THIS
-    LENGTH, // <--- ADD THIS
-    // Add other types if your MML expands (e.g., REST, VOLUME)
+    OCTAVE,
+    LENGTH,
+    REST,
+    // Add other types if your MML expands (e.g., VOLUME)
     UNKNOWN
 };
 
@@ -51,6 +52,13 @@ struct ParsedLength
     int value;
 };
 
+struct ParsedRest
+{
+    int length;                     // e.g., 4 for a quarter rest
+    double explicitDurationSeconds; // e.g., 2.5 for 2.5 seconds of rest
+    bool isExplicitDuration;        // True if explicitDurationSeconds is used
+};
+
 // Update ParsedCommand's variant to include new types
 struct ParsedCommand
 {
@@ -58,7 +66,7 @@ struct ParsedCommand
     std::string originalCommandString;
 
     // Add ParsedOctave and ParsedLength to the variant
-    std::variant<ParsedNote, ParsedTempo, ParsedOctave, ParsedLength> data;
+    std::variant<ParsedNote, ParsedTempo, ParsedOctave, ParsedLength, ParsedRest> data;
 
     // Removed the helper comment as std::get/std::get_if are standard access methods.
 };

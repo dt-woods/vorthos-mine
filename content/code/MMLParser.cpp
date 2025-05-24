@@ -292,8 +292,8 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
         }
 
         std::string command_type_str = current_token.substr(0, colon_pos);
-        std::string current_command_full_string = current_token; // This holds the token that starts the command
-        // std::string command_args_str = current_token.substr(colon_pos + 1);
+        // This holds the token that starts the command
+        std::string current_command_full_string = current_token;
 
         if (command_type_str == "TEMPO")
         {
@@ -375,6 +375,61 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
                 explicitDurationSeconds, // This should now be correctly parsed!
                 currentTempo);
             fullAudioOutput.insert(fullAudioOutput.end(), noteAudio.begin(), noteAudio.end());
+        }
+        else if (command_type_str == "r")
+        {
+            std::string rest_arg_str = current_token.substr(colon_pos + 1);
+            double restDurationSeconds = 0.0;
+            ParsedRest parsedRestData;
+            parsedRestData.isExplicitDuration = false;    // Assume length-based by default
+            parsedRestData.length = 0;                    // Initialize
+            parsedRestData.explicitDurationSeconds = 0.0; // Initialize
+
+            if (rest_arg_str.length() > 1 && rest_arg_str.back() == 's')
+            { // Check for explicit duration (e.g., "2.5s")
+                restDurationSeconds = parseDouble(rest_arg_str.substr(0, rest_arg_str.length() - 1));
+                parsedRestData.explicitDurationSeconds = restDurationSeconds;
+                parsedRestData.isExplicitDuration = true;
+            }
+            else
+            { // Assume it's a length (e.g., "8" for an eighth rest)
+                int restLength = parseInt(rest_arg_str, 0);
+                if (restLength > 0 && (restLength == 1 || restLength == 2 || restLength == 4 || restLength == 8 || restLength == 16 || restLength == 32 || restLength == 64))
+                {
+                    // Calculate rest duration based on current tempo and specified length
+                    // (60.0 / BPM) gives seconds per beat (quarter note)
+                    // (4.0 / length) scales it for other note lengths (e.g., 4/8 for eighth note)
+                    restDurationSeconds = (60.0 / currentTempo) * (4.0 / restLength);
+                    parsedRestData.length = restLength;
+                }
+                else
+                {
+                    std::cerr << "Warning: Invalid or unsupported rest length '" << rest_arg_str << "' in 'r:' command. Skipping rest." << std::endl;
+                    i++;      // Consume problematic token
+                    continue; // Skip processing this invalid rest
+                }
+            }
+
+            // Generate silence for the calculated duration
+            if (restDurationSeconds > 0)
+            {
+                // You'll need to define SAMPLE_RATE appropriately for your audio system.
+                // It might be a global constant, or obtained from your NoteDecoder or audio engine.
+                // For example:
+                // TODO: make this a global parameter!
+                const int SAMPLE_RATE = 44100; // Adjust this to your actual sample rate!
+
+                size_t numSamples = static_cast<size_t>(restDurationSeconds * SAMPLE_RATE);
+                std::vector<float> silentAudio(numSamples, 0.0f); // Vector of zeros (silence)
+                fullAudioOutput.insert(fullAudioOutput.end(), silentAudio.begin(), silentAudio.end());
+            }
+            else
+            {
+                std::cerr << "Warning: Rest duration calculated to be 0 or less for '" << current_token << "'. Skipping." << std::endl;
+            }
+
+            i++;      // Consume REST token
+            continue; // Move to the next command
         }
         else
         {
@@ -483,6 +538,57 @@ std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlString
             parsedCommands.push_back(pCmd);
             i++;
             continue;
+        }
+        else if (command_type_str == "r")
+        { // REST command
+            std::string rest_arg_str = current_token.substr(colon_pos + 1);
+            ParsedRest parsedRestData;
+            parsedRestData.isExplicitDuration = false;    // Assume length-based by default
+            parsedRestData.length = 0;                    // Initialize
+            parsedRestData.explicitDurationSeconds = 0.0; // Initialize
+
+            if (rest_arg_str.length() > 1 && rest_arg_str.back() == 's')
+            { // Check for explicit duration (e.g., "2.5s")
+                double explicitRestDur = parseDouble(rest_arg_str.substr(0, rest_arg_str.length() - 1));
+                if (explicitRestDur > 0)
+                {
+                    parsedRestData.explicitDurationSeconds = explicitRestDur;
+                    parsedRestData.isExplicitDuration = true;
+                }
+                else
+                {
+                    std::cerr << "Warning: Debug: Invalid or non-positive explicit rest duration '" << rest_arg_str << "' in 'r:' command. Marking as UNKNOWN." << std::endl;
+                    pCmd.type = CommandType::UNKNOWN;
+                    pCmd.originalCommandString = current_token;
+                    parsedCommands.push_back(pCmd);
+                    i++;
+                    continue;
+                }
+            }
+            else
+            { // Assume it's a length (e.g., "8" for an eighth rest)
+                int restLength = parseInt(rest_arg_str, 0);
+                if (restLength > 0 && (restLength == 1 || restLength == 2 || restLength == 4 || restLength == 8 || restLength == 16 || restLength == 32 || restLength == 64))
+                {
+                    parsedRestData.length = restLength;
+                }
+                else
+                {
+                    std::cerr << "Warning: Debug: Invalid or unsupported rest length '" << rest_arg_str << "' in 'r:' command. Marking as UNKNOWN." << std::endl;
+                    pCmd.type = CommandType::UNKNOWN;
+                    pCmd.originalCommandString = current_token;
+                    parsedCommands.push_back(pCmd);
+                    i++;
+                    continue;
+                }
+            }
+
+            pCmd.type = CommandType::REST;
+            pCmd.data = parsedRestData;
+            pCmd.originalCommandString = current_token; // Original string for REST is just current_token
+            parsedCommands.push_back(pCmd);
+            i++;
+            continue; // Move to the next command
         }
 
         // --- At this point, it must be a Note/Sound Command ---
