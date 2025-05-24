@@ -18,7 +18,7 @@ std::vector<float> generate_audio(const std::vector<float> &sample_data, double 
     std::vector<float> output_audio;
     if (sample_rate <= 0 || sample_data.empty() || desired_duration <= 0)
     {
-        // Return empty or throw, depending on desired error handling for invalid input
+        // Return empty for invalid input
         return output_audio;
     }
 
@@ -352,7 +352,7 @@ std::vector<float> NoteDecoder::getNoteAudio(
         // use the original sample's natural duration. This is especially
         // useful for percussive sounds like drums and one-shot noises.
         targetDurationSeconds = loadedSample.durationSeconds;
-        // std::cout << "Using natural sample duration: " << targetDurationSeconds << "s" << std::endl; // For debugging
+        std::cout << "Using natural sample duration: " << targetDurationSeconds << "s" << std::endl; // For debugging
     }
 
     // Ensure target duration is positive

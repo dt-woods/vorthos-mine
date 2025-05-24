@@ -1,12 +1,13 @@
-#include "NoteDecoder.h" // Include your NoteDecoder class
+// main.cpp
+
+#include "MMLParser.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <string>
+#include <variant> // Required for std::visit
 
-// HOW TO COMPILE:
-// g++ mc.cpp NoteDecoder.cpp -o mml_test -lsndfile -std=c++17
-
-// Helper to write raw PCM data (same as before)
+// Helper to write raw PCM file (for actual audio testing)
 void write_pcm_file(const std::string &filename, const std::vector<float> &audio_data)
 {
     std::ofstream outfile(filename, std::ios::binary);
@@ -23,118 +24,64 @@ void write_pcm_file(const std::string &filename, const std::vector<float> &audio
 int main()
 {
     // IMPORTANT: Replace with the actual base path to your waveform library!
-    // Example: "/home/user/my_waveforms" or "C:/Users/User/Documents/Waveforms"
-    const std::string waveformLibraryPath = "/home/user/Dropbox/Music/waveform_library";
-
-    // Output PCM file name
-    const std::string outputPcmFile = "test_output.pcm";
-
-    // Overall audio data that will be written to PCM
-    std::vector<float> final_audio_output;
+    const std::string waveformLibraryPath = "/path/to/your/waveform/library"; // <--- CHANGE THIS!
 
     try
     {
-        NoteDecoder decoder(waveformLibraryPath);
+        // Initialize parser with default settings (e.g., o4, length 4)
+        MMLParser parser(waveformLibraryPath, 120.0, 4, 4);
 
-        // --- Test 1: A4 square wave, 2 seconds, explicit duration ---
-        std::cout << "\n--- Testing A4 Square Wave (2s explicit) ---" << std::endl;
-        std::vector<float> sqr_a4_audio = decoder.getNoteAudio(
-            "sqr", // folderAbbr
-            "A",   // noteName
-            ' ',   // accidental (natural)
-            4,     // length (quarter note - though explicit duration overrides)
-            4,     // octave (4)
-            2.0,   // explicitDurationSeconds (2 seconds)
-            120.0  // currentTempoBPM
-        );
+        // --- Test MML Strings (UPDATED FOR NEW SYNTAX) ---
+        std::string mml1 = "TEMPO:150 OCTAVE:5 LENGTH:8 sqr:A tri:C+ X:kick01 1s";       // A and C+ should be o5, length 8
+        std::string mml2 = "TEMPO:90 imp:G+2o3 4s noise:white1s 1s";                     // G+ should be o3, length 2
+        std::string mml3 = "OCTAVE:3 LENGTH:16 sqr:C tri:E+o4 imp:G- 0.5s";              // C should be o3, length 16. E+ should be o4, length 16. G- explicit duration.
+        std::string mml4 = "invalid_command sqr:A+4o4o4 TEMPO:abc OCTAVE:xyz LENGTH:1s"; // Test invalid/malformed commands
+        std::string mml5 = "sqr:C tri:D+ imp:E-";                                        // Should use initial defaults (o4, length 4)
 
-        if (!sqr_a4_audio.empty())
-        {
-            std::cout << "Generated A4 square wave audio size: " << sqr_a4_audio.size() << " samples." << std::endl;
-            final_audio_output.insert(final_audio_output.end(), sqr_a4_audio.begin(), sqr_a4_audio.end());
-        }
-        else
-        {
-            std::cerr << "Failed to generate A4 square wave audio." << std::endl;
-        }
+        std::vector<std::string> testMMLs = {mml1, mml2, mml3, mml4, mml5};
 
-        // --- Test 2: Snare drum, natural duration (no explicit length/duration) ---
-        // Add some silence between notes for clarity
-        int commonSampleRate = decoder.getLoadedSampleRate();
-        size_t silence_samples_1s = commonSampleRate; // For 1 s of silence at this rate
-        if (silence_samples_1s > 0)
+        for (int i = 0; i < testMMLs.size(); ++i)
         {
-            final_audio_output.insert(final_audio_output.end(), silence_samples_1s, 0.0f);
-            std::cout << "\n--- Adding 1 second of silence ---" << std::endl;
-        }
+            std::cout << "\n--- Debug Parsing MML String " << (i + 1) << ": '" << testMMLs[i] << "' ---" << std::endl;
+            std::vector<ParsedCommand> commands = parser.debugParseMML(testMMLs[i]);
 
-        std::cout << "\n--- Testing Snare Drum (natural duration) ---" << std::endl;
-        std::vector<float> snare_audio = decoder.getNoteAudio(
-            "X",       // folderAbbr (for casio-drums)
-            "snare01", // noteName (style + variant)
-            ' ',       // accidental (ignored for drums)
-            0,         // length (0, so it uses natural duration)
-            0,         // octave (ignored for drums)
-            0.0,       // explicitDurationSeconds (0.0, so it uses natural duration)
-            120.0      // currentTempoBPM (ignored for natural duration)
-        );
+            for (const auto &cmd : commands)
+            {
+                std::cout << "  Original: '" << cmd.originalCommandString << "' -> ";
 
-        if (!snare_audio.empty())
-        {
-            std::cout << "Generated Snare audio size: " << snare_audio.size() << " samples." << std::endl;
-            final_audio_output.insert(final_audio_output.end(), snare_audio.begin(), snare_audio.end());
-        }
-        else
-        {
-            std::cerr << "Failed to generate Snare audio." << std::endl;
+                // Use std::visit to safely access variant data
+                std::visit([&](auto &&arg)
+                           {
+                    using T = std::decay_t<decltype(arg)>;
+                    if constexpr (std::is_same_v<T, ParsedNote>) {
+                        std::cout << "NOTE { Folder: " << arg.folderAbbr
+                                  << ", Name: " << arg.noteName
+                                  << ", Accidental: '" << (arg.accidental == ' ' ? "natural" : std::string(1, arg.accidental)) << "'"
+                                  << ", Length: " << arg.length
+                                  << ", Octave: " << arg.octave
+                                  << ", Explicit Duration: " << arg.explicitDurationSeconds << "s }";
+                    } else if constexpr (std::is_same_v<T, ParsedTempo>) {
+                        std::cout << "TEMPO { Value: " << arg.value << " BPM }";
+                    } else if constexpr (std::is_same_v<T, ParsedOctave>) { // New output for Octave
+                        std::cout << "OCTAVE { Value: " << arg.value << " }";
+                    } else if constexpr (std::is_same_v<T, ParsedLength>) { // New output for Length
+                        std::cout << "LENGTH { Value: " << arg.value << " }";
+                    } }, cmd.data);
+
+                if (cmd.type == CommandType::UNKNOWN)
+                { // Handle UNKNOWN explicitly if variant isn't handled for it
+                    std::cout << "UNKNOWN COMMAND";
+                }
+                std::cout << std::endl;
+            }
         }
 
-        // --- Test 3: Cb5 Triangle wave (should map to B5.wav), 1.5 seconds, derived from length ---
-        // Add some silence between notes for clarity
-        if (silence_samples_1s > 0)
-        {
-            final_audio_output.insert(final_audio_output.end(), silence_samples_1s, 0.0f);
-            std::cout << "\n--- Adding 1 second of silence ---" << std::endl;
-        }
-
-        std::cout << "\n--- Testing Cb5 Triangle Wave (1.5s derived from length) ---" << std::endl;
-        // Tempo 60 BPM: quarter note = 1 second. Half note (length 2) = 2 seconds.
-        // So, 1.5 seconds is 1.5 * (1/4) = 0.375 of a whole note.
-        // This is a bit tricky to map exactly to standard lengths, so we'll use a length
-        // that results in roughly 1.5s at 60 BPM, or just note that the calculation
-        // will give us 1.5s if currentTempoBPM and length were adjusted.
-        // Let's target 1.5 seconds by using length 4 (quarter note) at 40 BPM (60/40 * 4/4 = 1.5s)
-        std::vector<float> tri_cb5_audio = decoder.getNoteAudio(
-            "tri", // folderAbbr
-            "C",   // noteName
-            '-',   // accidental (flat)
-            4,     // length (quarter note)
-            5,     // octave (5)
-            0.0,   // explicitDurationSeconds (0.0, so it uses length)
-            40.0   // currentTempoBPM (set to 40 for 1.5s quarter note)
-        );
-
-        if (!tri_cb5_audio.empty())
-        {
-            std::cout << "Generated Cb5 triangle wave audio size: " << tri_cb5_audio.size() << " samples." << std::endl;
-            final_audio_output.insert(final_audio_output.end(), tri_cb5_audio.begin(), tri_cb5_audio.end());
-        }
-        else
-        {
-            std::cerr << "Failed to generate Cb5 triangle wave audio." << std::endl;
-        }
-
-        // 4. Write the combined audio to PCM file
-        if (!final_audio_output.empty())
-        {
-            write_pcm_file(outputPcmFile, final_audio_output);
-            std::cout << "\nPlayback Info for FFmpeg/VLC (assuming 44100 Hz, 1 channel from your samples):" << std::endl;
-            std::cout << "  ffmpeg -f f32le -ar 44100 -ac 1 -i " << outputPcmFile << " output.mp3" << std::endl;
-        }
-        else
-        {
-            std::cerr << "No audio generated for output." << std::endl;
-        }
+        // Example of actual audio generation (uncomment and test if you wish)
+        // std::cout << "\n--- Generating Audio for mml1 ---" << std::endl;
+        // std::vector<float> final_audio = parser.parseMML(mml1);
+        // if (!final_audio.empty()) {
+        //     write_pcm_file("mml1_output.pcm", final_audio);
+        // }
     }
     catch (const std::exception &e)
     {
