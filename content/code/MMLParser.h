@@ -7,7 +7,11 @@
 #include <vector>
 #include <memory>
 #include <variant> // For std::variant (C++17)
+#include "AudioUtils.h"
 #include "NoteDecoder.h"
+
+// Define the global audio sample rate
+const int SAMPLE_RATE = 44100; // <--- ADD THIS LINE (Adjust value if needed)
 
 // --- New structs for parsed command information ---
 
@@ -83,10 +87,11 @@ public:
               int defaultLength = 4); // New default for initial length (e.g., quarter note)
 
     std::vector<float> parseMML(const std::string &mmlString);
-    std::vector<ParsedCommand> debugParseMML(const std::string &mmlString) const;
+    // UPDATED: debugParseMML now takes a file path
+    std::vector<ParsedCommand> debugParseMML(const std::string &mmlFilePath);
 
 private:
-    std::unique_ptr<NoteDecoder> m_noteDecoder;
+    NoteDecoder m_noteDecoder; // <--- This is the change
 
     // Member variables for current global settings
     double m_currentTempoBPM;

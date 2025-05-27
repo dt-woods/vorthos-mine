@@ -1,3 +1,4 @@
+#include "AudioUtils.h"
 #include "MMLParser.h"
 #include <sstream>   // For std::istringstream
 #include <algorithm> // For std::remove_if, std::transform
@@ -6,13 +7,20 @@
 #include <string>    // For std::string::npos, substr etc
 
 // Constructor implementation (MODIFIED)
-MMLParser::MMLParser(const std::string &waveformLibraryPath, double defaultTempoBPM, int defaultOctave, int defaultLength)
-    : m_noteDecoder(std::make_unique<NoteDecoder>(waveformLibraryPath)),
+// MMLParser constructor implementation (CORRECTED)
+MMLParser::MMLParser(const std::string &waveformLibraryPath,
+                     double defaultTempoBPM,
+                     int defaultOctave,
+                     int defaultLength)
+    // Initialize member variables in the initializer list
+    : m_noteDecoder(waveformLibraryPath), // Initialize the NoteDecoder member here
       m_currentTempoBPM(defaultTempoBPM),
-      m_currentOctave(defaultOctave), // Initialize new members
-      m_currentLength(defaultLength)  // Initialize new members
+      m_currentOctave(defaultOctave),
+      m_currentLength(defaultLength)
 {
-    // Constructor initializes the NoteDecoder and sets the default global settings.
+    // Any additional setup if needed
+    std::cout << "MMLParser initialized with waveform library: " << waveformLibraryPath << std::endl;
+    std::cout << "Default Tempo: " << m_currentTempoBPM << ", Octave: " << m_currentOctave << ", Length: " << m_currentLength << std::endl;
 }
 
 // Helper: splitString (Basic implementation)
@@ -266,290 +274,264 @@ bool isExplicitDurationToken(const std::string &token)
 std::vector<float> MMLParser::parseMML(const std::string &mmlString)
 {
     std::vector<float> fullAudioOutput;
-    double currentTempo = m_currentTempoBPM;
-    int currentOctave = m_currentOctave;
-    int currentLength = m_currentLength;
 
-    std::vector<std::string> command_tokens = splitString(mmlString, ' ');
-    size_t i = 0; // Use index for iteration
+    // Initialize current state (these will be updated by TEMPO, OCTAVE, LENGTH commands)
+    double currentTempo = m_currentTempoBPM; // Start with default BPM
+    int currentOctave = m_currentOctave;     // Start with default octave
+    int currentLength = m_currentLength;     // Start with default length
 
-    while (i < command_tokens.size())
-    {
-        const std::string &current_token = command_tokens[i];
+    std::cout << "Tempo set to: " << currentTempo << " BPM" << std::endl;
+    std::cout << "Default octave set to: " << currentOctave << std::endl;
+    std::cout << "Default length set to: " << currentLength << std::endl;
 
-        if (current_token.empty())
-        {
-            i++;
-            continue;
-        }
+    // --- CRITICAL CHANGE HERE: Use std::stringstream for robust tokenization ---
+    std::stringstream ss(mmlString);
+    std::string current_token;
+
+    // The loop now correctly extracts tokens separated by any whitespace (including newlines)
+    while (ss >> current_token)
+    { // Loop advances token automatically
+        // No more 'i' index or manual 'i++' needed.
+
+        std::string command_type_str;
+        std::string command_args_str;
 
         size_t colon_pos = current_token.find(':');
-        if (colon_pos == std::string::npos)
+        if (colon_pos != std::string::npos)
         {
-            std::cerr << "Error: Command '" << current_token << "' is missing a colon ':' delimiter. Skipping." << std::endl;
-            i++; // Consume the problematic token
-            continue;
+            command_type_str = current_token.substr(0, colon_pos);
+            command_args_str = current_token.substr(colon_pos + 1);
+        }
+        else
+        {
+            // If no colon, assume it's a note with default folder (e.g., "C4")
+            // This logic should match what you have in debugParseMML for notes without explicit folders
+            // For example:
+            command_type_str = "sqr"; // Default to squarewave folder if no colon
+            command_args_str = current_token;
         }
 
-        std::string command_type_str = current_token.substr(0, colon_pos);
-        // This holds the token that starts the command
-        std::string current_command_full_string = current_token;
+        // Convert command_type_str to lowercase for case-insensitive comparison
+        std::transform(command_type_str.begin(), command_type_str.end(), command_type_str.begin(),
+                       [](unsigned char c)
+                       { return std::tolower(c); });
 
-        if (command_type_str == "TEMPO")
+        if (command_type_str == "tempo")
         {
-            double newTempo = parseDouble(current_token.substr(colon_pos + 1)); // Directly use substr
-            if (newTempo > 0)
+            double tempo = parseDouble(command_args_str);
+            if (tempo > 0)
             {
-                currentTempo = newTempo;
-                std::cout << "Tempo set to: " << currentTempo << " BPM" << std::endl;
+                currentTempo = tempo;
+                std::cout << "Tempo changed to: " << currentTempo << " BPM" << std::endl;
             }
             else
             {
-                std::cerr << "Warning: Invalid tempo value '" << current_token.substr(colon_pos + 1) << "' in TEMPO command. Keeping current tempo." << std::endl;
+                std::cerr << "Warning: Invalid tempo value '" << command_args_str << "'. Using current tempo." << std::endl;
             }
-            i++;
-            continue;
+            // No 'continue;' or 'i++;' needed here, loop handles next token automatically
         }
-        else if (command_type_str == "OCTAVE")
+        else if (command_type_str == "octave")
         {
-            int newOctave = parseInt(current_token.substr(colon_pos + 1), -1); // Directly use substr
-            if (newOctave >= 0)
+            int octave = parseInt(command_args_str);
+            if (octave >= 0 && octave <= 8)
             {
-                currentOctave = newOctave;
-                std::cout << "Default octave set to: " << currentOctave << std::endl;
+                currentOctave = octave;
+                std::cout << "Octave changed to: " << currentOctave << std::endl;
             }
             else
             {
-                std::cerr << "Warning: Invalid octave value '" << current_token.substr(colon_pos + 1) << "' in OCTAVE command. Keeping current default octave." << std::endl;
+                std::cerr << "Warning: Invalid octave value '" << command_args_str << "'. Using current octave." << std::endl;
             }
-            i++;
-            continue;
         }
-        else if (command_type_str == "LENGTH")
+        else if (command_type_str == "length")
         {
-            int newLength = parseInt(current_token.substr(colon_pos + 1), -1); // Directly use substr
-            if (newLength > 0 && (newLength == 1 || newLength == 2 || newLength == 4 || newLength == 8 || newLength == 16 || newLength == 32 || newLength == 64))
+            int length = parseInt(command_args_str);
+            if (length > 0 && (length == 1 || length == 2 || length == 4 || length == 8 || length == 16 || length == 32 || length == 64))
             {
-                currentLength = newLength;
-                std::cout << "Default length set to: 1/" << currentLength << " note." << std::endl;
+                currentLength = length;
+                std::cout << "Length changed to: " << currentLength << std::endl;
             }
             else
             {
-                std::cerr << "Warning: Invalid or unsupported length value '" << current_token.substr(colon_pos + 1) << "' in LENGTH command. Keeping current default length." << std::endl;
+                std::cerr << "Warning: Invalid or unsupported length value '" << command_args_str << "' in LENGTH command. Keeping current default length." << std::endl;
             }
-            i++;
-            continue;
-        }
-
-        // --- At this point, it must be a Note/Sound Command ---
-
-        // Check if there's a subsequent token that looks like an explicit duration ("Xs")
-        size_t next_token_idx = i + 1;
-        if (next_token_idx < command_tokens.size() && isExplicitDurationToken(command_tokens[next_token_idx]))
-        {
-            current_command_full_string += " " + command_tokens[next_token_idx]; // Combine "X:kick01" and "1s"
-            i++;                                                                 // Increment 'i' to consume the duration token along with the current_token
-        }
-
-        // Now, extract command_args_str from the potentially combined string
-        std::string command_args_str = current_command_full_string.substr(colon_pos + 1); // <--- THIS IS THE KEY FIX
-
-        std::string folderAbbr = command_type_str; // folderAbbr is from current_token
-        std::string noteName;
-        char accidental;
-        int length_for_note;
-        int octave_for_note;
-        double explicitDurationSeconds;
-
-        if (parseNoteCommand(command_args_str, // Pass the correct combined arguments string
-                             folderAbbr, noteName, accidental,
-                             length_for_note, octave_for_note, explicitDurationSeconds,
-                             currentLength, currentOctave))
-        {
-            std::vector<float> noteAudio = m_noteDecoder->getNoteAudio(
-                folderAbbr,
-                noteName,
-                accidental,
-                length_for_note,
-                octave_for_note,
-                explicitDurationSeconds, // This should now be correctly parsed!
-                currentTempo);
-            fullAudioOutput.insert(fullAudioOutput.end(), noteAudio.begin(), noteAudio.end());
         }
         else if (command_type_str == "r")
-        {
-            std::string rest_arg_str = current_token.substr(colon_pos + 1);
+        { // REST command
             double restDurationSeconds = 0.0;
-            ParsedRest parsedRestData;
-            parsedRestData.isExplicitDuration = false;    // Assume length-based by default
-            parsedRestData.length = 0;                    // Initialize
-            parsedRestData.explicitDurationSeconds = 0.0; // Initialize
 
-            if (rest_arg_str.length() > 1 && rest_arg_str.back() == 's')
-            { // Check for explicit duration (e.g., "2.5s")
-                restDurationSeconds = parseDouble(rest_arg_str.substr(0, rest_arg_str.length() - 1));
-                parsedRestData.explicitDurationSeconds = restDurationSeconds;
-                parsedRestData.isExplicitDuration = true;
+            if (command_args_str.length() > 1 && command_args_str.back() == 's')
+            {
+                restDurationSeconds = parseDouble(command_args_str.substr(0, command_args_str.length() - 1));
             }
             else
-            { // Assume it's a length (e.g., "8" for an eighth rest)
-                int restLength = parseInt(rest_arg_str, 0);
+            {
+                int restLength = parseInt(command_args_str, 0);
                 if (restLength > 0 && (restLength == 1 || restLength == 2 || restLength == 4 || restLength == 8 || restLength == 16 || restLength == 32 || restLength == 64))
                 {
-                    // Calculate rest duration based on current tempo and specified length
-                    // (60.0 / BPM) gives seconds per beat (quarter note)
-                    // (4.0 / length) scales it for other note lengths (e.g., 4/8 for eighth note)
                     restDurationSeconds = (60.0 / currentTempo) * (4.0 / restLength);
-                    parsedRestData.length = restLength;
                 }
                 else
                 {
-                    std::cerr << "Warning: Invalid or unsupported rest length '" << rest_arg_str << "' in 'r:' command. Skipping rest." << std::endl;
-                    i++;      // Consume problematic token
-                    continue; // Skip processing this invalid rest
+                    std::cerr << "Warning: Invalid or unsupported rest length '" << command_args_str << "' in 'r:' command. Skipping rest." << std::endl;
+                    // No audio added, loop proceeds to next token
                 }
             }
 
-            // Generate silence for the calculated duration
             if (restDurationSeconds > 0)
             {
-                // You'll need to define SAMPLE_RATE appropriately for your audio system.
-                // It might be a global constant, or obtained from your NoteDecoder or audio engine.
-                // For example:
-                // TODO: make this a global parameter!
-                const int SAMPLE_RATE = 44100; // Adjust this to your actual sample rate!
-
                 size_t numSamples = static_cast<size_t>(restDurationSeconds * SAMPLE_RATE);
-                std::vector<float> silentAudio(numSamples, 0.0f); // Vector of zeros (silence)
+                std::vector<float> silentAudio(numSamples, 0.0f);
                 fullAudioOutput.insert(fullAudioOutput.end(), silentAudio.begin(), silentAudio.end());
             }
             else
             {
                 std::cerr << "Warning: Rest duration calculated to be 0 or less for '" << current_token << "'. Skipping." << std::endl;
             }
-
-            i++;      // Consume REST token
-            continue; // Move to the next command
         }
         else
-        {
-            std::cerr << "Error: Failed to parse note command: '" << current_command_full_string << "'" << std::endl;
+        {                                              // Assume it's a Note/Sound Command (e.g., "sqr:C4", "C4")
+            std::string folderAbbr = command_type_str; // folder is the part before colon or default
+            std::string noteName;
+            char accidental;
+            int length_for_note = 0;
+            int octave_for_note = 0;
+            double explicitDurationSeconds = 0.0;
+
+            std::cout << " DEBUG: parseNoteCommand received '" << command_args_str << "'" << std::endl; // Debug log
+
+            if (this->parseNoteCommand(command_args_str, folderAbbr, noteName, accidental,
+                                       length_for_note, octave_for_note, explicitDurationSeconds,
+                                       currentLength, currentOctave))
+            {
+                std::vector<float> noteAudio = m_noteDecoder.getNoteAudio(
+                    folderAbbr,
+                    noteName,
+                    accidental,
+                    length_for_note,
+                    octave_for_note,
+                    explicitDurationSeconds,
+                    currentTempo);
+                fullAudioOutput.insert(fullAudioOutput.end(), noteAudio.begin(), noteAudio.end());
+            }
+            else
+            {
+                std::cerr << "Error: Could not parse note command '" << current_token << "'. Skipping." << std::endl;
+            }
         }
-        i++; // Consume the current_token (and potentially the duration token if it was combined)
-    }
+    } // End while loop
+
     return fullAudioOutput;
 }
 
-// debugParseMML Implementation (REVISED for explicit durations)
-std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlString) const
+// UPDATED: debugParseMML implementation
+std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlFilePath)
 {
     std::vector<ParsedCommand> parsedCommands;
-    double currentDebugTempo = 120.0;
-    int currentDebugOctave = 4;
-    int currentDebugLength = 4;
+    std::string mmlString = readFileIntoString(mmlFilePath); // <--- Read file content here
 
-    std::vector<std::string> command_tokens = splitString(mmlString, ' ');
-    size_t i = 0; // Use index for iteration
-
-    while (i < command_tokens.size())
+    if (mmlString.empty())
     {
-        const std::string &current_token = command_tokens[i];
+        // readFileIntoString already printed an error. Just return empty.
+        return parsedCommands;
+    }
 
-        if (current_token.empty())
-        {
-            i++;
-            continue;
-        }
+    std::cout << "\n--- Debug Parsing MML String from file: '" << mmlFilePath << "' ---" << std::endl;
 
+    // Initialize current state (these will be updated by TEMPO, OCTAVE, LENGTH commands)
+    double currentTempo = 120.0;
+    int currentOctave = 4;
+    int currentLength = 4;
+
+    // Tokenize the MML string
+    std::stringstream ss(mmlString);
+    std::string current_token;
+
+    // This loop now iterates through tokens parsed from the file content
+    while (ss >> current_token)
+    {
         ParsedCommand pCmd;
-        // The originalCommandString should capture the *entire logical command*,
-        // including its explicit duration if it has one. We'll set this below.
-        // pCmd.originalCommandString = current_token;
+        pCmd.originalCommandString = current_token; // Store original for debug output
+        CommandType type = CommandType::UNKNOWN;
+        std::string command_type_str;
+        std::string command_args_str;
 
         size_t colon_pos = current_token.find(':');
-        if (colon_pos == std::string::npos)
+        if (colon_pos != std::string::npos)
         {
-            std::cerr << "Error: Debug: Command '" << current_token << "' is missing a colon ':' delimiter. Marking as UNKNOWN." << std::endl;
-            pCmd.type = CommandType::UNKNOWN;
-            pCmd.originalCommandString = current_token; // Set for debug output
-            parsedCommands.push_back(pCmd);
-            i++;
-            continue;
+            command_type_str = current_token.substr(0, colon_pos);
+            command_args_str = current_token.substr(colon_pos + 1);
+        }
+        else
+        {
+            // If no colon, assume it's a note with default folder (e.g., "C4")
+            // This is a simplification for basic MML, adjust if your grammar allows non-colon notes
+            command_type_str = "note"; // A placeholder type to fall into note parsing
+            command_args_str = current_token;
         }
 
-        std::string command_type_str = current_token.substr(0, colon_pos);
-        std::string command_args_str_initial = current_token.substr(colon_pos + 1); // Store args of initial token
+        // Convert command_type_str to lowercase for case-insensitive comparison
+        std::transform(command_type_str.begin(), command_type_str.end(), command_type_str.begin(),
+                       [](unsigned char c)
+                       { return std::tolower(c); });
 
-        std::string final_command_full_string = current_token; // Start with the first token of the command
-
-        if (command_type_str == "TEMPO")
+        if (command_type_str == "tempo")
         {
-            double newTempo = parseDouble(command_args_str_initial);
-            if (newTempo > 0)
+            type = CommandType::TEMPO;
+            double tempo = parseDouble(command_args_str);
+            if (tempo > 0)
             {
-                currentDebugTempo = newTempo;
-                pCmd.type = CommandType::TEMPO;
-                pCmd.data = ParsedTempo{newTempo};
+                currentTempo = tempo;
+                pCmd.data = ParsedTempo{tempo};
             }
             else
             {
-                std::cerr << "Warning: Debug: Invalid tempo value '" << command_args_str_initial << "' in TEMPO command. Marking as UNKNOWN." << std::endl;
-                pCmd.type = CommandType::UNKNOWN;
+                std::cerr << "Warning: Invalid tempo value '" << command_args_str << "'. Using current tempo." << std::endl;
+                type = CommandType::UNKNOWN; // Mark as unknown if value is invalid
             }
-            pCmd.originalCommandString = final_command_full_string; // Original string for TEMPO is just current_token
-            parsedCommands.push_back(pCmd);
-            i++;
-            continue;
         }
-        else if (command_type_str == "OCTAVE")
+        else if (command_type_str == "octave")
         {
-            int newOctave = parseInt(command_args_str_initial, -1);
-            if (newOctave >= 0)
-            {
-                currentDebugOctave = newOctave;
-                pCmd.type = CommandType::OCTAVE;
-                pCmd.data = ParsedOctave{newOctave};
+            type = CommandType::OCTAVE;
+            int octave = parseInt(command_args_str);
+            if (octave >= 0 && octave <= 8)
+            { // Typical MIDI octave range
+                currentOctave = octave;
+                pCmd.data = ParsedOctave{octave};
             }
             else
             {
-                std::cerr << "Warning: Debug: Invalid octave value '" << command_args_str_initial << "' in OCTAVE command. Marking as UNKNOWN." << std::endl;
-                pCmd.type = CommandType::UNKNOWN;
+                std::cerr << "Warning: Invalid octave value '" << command_args_str << "'. Using current octave." << std::endl;
+                type = CommandType::UNKNOWN;
             }
-            pCmd.originalCommandString = final_command_full_string; // Original string for OCTAVE is just current_token
-            parsedCommands.push_back(pCmd);
-            i++;
-            continue;
         }
-        else if (command_type_str == "LENGTH")
+        else if (command_type_str == "length")
         {
-            int newLength = parseInt(command_args_str_initial, -1);
-            if (newLength > 0 && (newLength == 1 || newLength == 2 || newLength == 4 || newLength == 8 || newLength == 16 || newLength == 32 || newLength == 64))
+            type = CommandType::LENGTH;
+            int length = parseInt(command_args_str);
+            // Valid common lengths for musical notes
+            if (length > 0 && (length == 1 || length == 2 || length == 4 || length == 8 || length == 16 || length == 32 || length == 64))
             {
-                currentDebugLength = newLength;
-                pCmd.type = CommandType::LENGTH;
-                pCmd.data = ParsedLength{newLength};
+                currentLength = length;
+                pCmd.data = ParsedLength{length};
             }
             else
             {
-                std::cerr << "Warning: Debug: Invalid or unsupported length value '" << command_args_str_initial << "' in LENGTH command. Marking as UNKNOWN." << std::endl;
-                pCmd.type = CommandType::UNKNOWN;
+                std::cerr << "Warning: Invalid length value '" << command_args_str << "'. Using current length." << std::endl;
+                type = CommandType::UNKNOWN;
             }
-            pCmd.originalCommandString = final_command_full_string; // Original string for LENGTH is just current_token
-            parsedCommands.push_back(pCmd);
-            i++;
-            continue;
         }
         else if (command_type_str == "r")
         { // REST command
-            std::string rest_arg_str = current_token.substr(colon_pos + 1);
+            type = CommandType::REST;
             ParsedRest parsedRestData;
-            parsedRestData.isExplicitDuration = false;    // Assume length-based by default
-            parsedRestData.length = 0;                    // Initialize
-            parsedRestData.explicitDurationSeconds = 0.0; // Initialize
+            parsedRestData.isExplicitDuration = false;
+            parsedRestData.length = 0;
+            parsedRestData.explicitDurationSeconds = 0.0;
 
-            if (rest_arg_str.length() > 1 && rest_arg_str.back() == 's')
-            { // Check for explicit duration (e.g., "2.5s")
-                double explicitRestDur = parseDouble(rest_arg_str.substr(0, rest_arg_str.length() - 1));
+            if (command_args_str.length() > 1 && command_args_str.back() == 's')
+            {
+                double explicitRestDur = parseDouble(command_args_str.substr(0, command_args_str.length() - 1));
                 if (explicitRestDur > 0)
                 {
                     parsedRestData.explicitDurationSeconds = explicitRestDur;
@@ -557,82 +539,57 @@ std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlString
                 }
                 else
                 {
-                    std::cerr << "Warning: Debug: Invalid or non-positive explicit rest duration '" << rest_arg_str << "' in 'r:' command. Marking as UNKNOWN." << std::endl;
-                    pCmd.type = CommandType::UNKNOWN;
-                    pCmd.originalCommandString = current_token;
-                    parsedCommands.push_back(pCmd);
-                    i++;
-                    continue;
+                    std::cerr << "Warning: Debug: Invalid or non-positive explicit rest duration '" << command_args_str << "' in 'r:' command. Marking as UNKNOWN." << std::endl;
+                    type = CommandType::UNKNOWN;
                 }
             }
             else
-            { // Assume it's a length (e.g., "8" for an eighth rest)
-                int restLength = parseInt(rest_arg_str, 0);
+            {
+                int restLength = parseInt(command_args_str, 0);
                 if (restLength > 0 && (restLength == 1 || restLength == 2 || restLength == 4 || restLength == 8 || restLength == 16 || restLength == 32 || restLength == 64))
                 {
                     parsedRestData.length = restLength;
                 }
                 else
                 {
-                    std::cerr << "Warning: Debug: Invalid or unsupported rest length '" << rest_arg_str << "' in 'r:' command. Marking as UNKNOWN." << std::endl;
-                    pCmd.type = CommandType::UNKNOWN;
-                    pCmd.originalCommandString = current_token;
-                    parsedCommands.push_back(pCmd);
-                    i++;
-                    continue;
+                    std::cerr << "Warning: Debug: Invalid or unsupported rest length '" << command_args_str << "' in 'r:' command. Marking as UNKNOWN." << std::endl;
+                    type = CommandType::UNKNOWN;
                 }
             }
-
-            pCmd.type = CommandType::REST;
-            pCmd.data = parsedRestData;
-            pCmd.originalCommandString = current_token; // Original string for REST is just current_token
-            parsedCommands.push_back(pCmd);
-            i++;
-            continue; // Move to the next command
-        }
-
-        // --- At this point, it must be a Note/Sound Command ---
-
-        // Check if there's a subsequent token that looks like an explicit duration ("Xs")
-        size_t next_token_idx = i + 1;
-        if (next_token_idx < command_tokens.size() && isExplicitDurationToken(command_tokens[next_token_idx]))
-        {
-            final_command_full_string += " " + command_tokens[next_token_idx]; // Combine "X:kick01" and "1s"
-            i++;                                                               // Increment 'i' to consume the duration token along with the current_token
-        }
-
-        // Now, extract command_args_str from the potentially combined string
-        std::string command_args_for_note_parsing = final_command_full_string.substr(colon_pos + 1); // <--- THIS IS THE KEY FIX
-
-        std::string folderAbbr = command_type_str;
-        std::string noteName;
-        char accidental;
-        int length_for_note;
-        int octave_for_note;
-        double explicitDurationSeconds;
-
-        if (parseNoteCommand(command_args_for_note_parsing, // Pass the correct combined arguments string
-                             folderAbbr, noteName, accidental,
-                             length_for_note, octave_for_note, explicitDurationSeconds,
-                             currentDebugLength, currentDebugOctave))
-        {
-            pCmd.type = CommandType::NOTE;
-            pCmd.data = ParsedNote{
-                folderAbbr,
-                noteName,
-                accidental,
-                length_for_note,
-                octave_for_note,
-                explicitDurationSeconds};
+            pCmd.data = parsedRestData; // Assign rest data whether valid or not (type is UNKNOWN if invalid)
         }
         else
-        {
-            std::cerr << "Error: Debug: Failed to parse note command: '" << final_command_full_string << "'." << std::endl;
-            pCmd.type = CommandType::UNKNOWN;
+        { // Assume it's a Note/Sound Command (e.g., "sqr:C4", "tri:D+")
+            type = CommandType::NOTE;
+            std::string folderAbbr = command_type_str; // folder is the part before colon
+            std::string noteName;
+            char accidental;
+            int length_for_note = 0;
+            int octave_for_note = 0;
+            double explicitDurationSeconds = 0.0;
+
+            // Call parseNoteCommand - assumes it's a standalone function or member
+            // If parseNoteCommand is a private member, you'll need to call it with `this->`
+            // If it's a non-member helper, ensure it's accessible.
+            // For now, let's assume it's a private member function that handles parsing.
+            // This is the function that parses "C4" or "D+ 1s"
+            if (!this->parseNoteCommand(command_args_str, folderAbbr, noteName, accidental,
+                                        length_for_note, octave_for_note, explicitDurationSeconds,
+                                        currentLength, currentOctave))
+            {
+                std::cerr << "Warning: Could not parse note command '" << current_token << "'. Marking as UNKNOWN." << std::endl;
+                type = CommandType::UNKNOWN;
+            }
+            // Populate ParsedNote
+            pCmd.data = ParsedNote{folderAbbr, noteName, accidental,
+                                   length_for_note, octave_for_note, explicitDurationSeconds};
         }
-        pCmd.originalCommandString = final_command_full_string; // Set original string for note command
-        parsedCommands.push_back(pCmd);
-        i++;
-    }
+
+        pCmd.type = type;               // Set the determined command type
+        parsedCommands.push_back(pCmd); // Add to our list
+
+    } // End while loop
+
+    std::cout << "--- Debug Parsing Complete ---" << std::endl;
     return parsedCommands;
 }
