@@ -240,6 +240,138 @@ bool MMLParser::parseNoteCommand(
     return true;
 }
 
+
+// --- NEW parseNoteString Implementation ---
+bool MMLParser::parseNoteString(const std::string &fullNoteString,
+                                std::string &folderAbbr,
+                                std::string &noteName,
+                                char &accidental,
+                                int &length_for_note,
+                                int &octave_for_note,
+                                double &explicitDurationSeconds,
+                                int defaultLength,
+                                int defaultOctave)
+{
+    noteName = "";
+    accidental = ' ';
+    length_for_note = defaultLength; // Default to current MML length
+    octave_for_note = defaultOctave; // Default to current MML octave
+    explicitDurationSeconds = 0.0;
+
+    std::string temp_note_str = fullNoteString;
+
+    // Check for explicit folder (e.g., "sqr:C4", "tri:G#3")
+    size_t colon_pos = temp_note_str.find(':');
+    if (colon_pos != std::string::npos)
+    {
+        folderAbbr = temp_note_str.substr(0, colon_pos);
+        temp_note_str = temp_note_str.substr(colon_pos + 1); // Remaining part after folder
+    }
+    else
+    {
+        folderAbbr = "sqr"; // Default folder if not specified
+    }
+
+    // Check for explicit duration (e.g., "C4 0.5s")
+    size_t space_pos = temp_note_str.find(' ');
+    if (space_pos != std::string::npos)
+    {
+        std::string duration_part = temp_note_str.substr(space_pos + 1);
+        temp_note_str = temp_note_str.substr(0, space_pos); // Note part before space
+
+        if (duration_part.length() > 1 && duration_part.back() == 's')
+        {
+            explicitDurationSeconds = parseDouble(duration_part.substr(0, duration_part.length() - 1));
+            if (explicitDurationSeconds <= 0)
+            {
+                std::cerr << "Warning: Invalid explicit duration '" << duration_part << "' for note '" << fullNoteString << "'. Ignoring explicit duration." << std::endl;
+                explicitDurationSeconds = 0.0; // Reset if invalid
+            }
+        }
+        else
+        {
+            // Handle explicit length values if needed here (e.g., C4L8) - currently done by just a number
+            // For now, assume a trailing number without 's' is part of length/octave parsing
+            std::cerr << "Warning: Unrecognized duration format '" << duration_part << "' for note '" << fullNoteString << "'. Ignoring." << std::endl;
+        }
+    }
+
+    // Trim remaining temp_note_str (e.g., "C#4" or "C")
+    temp_note_str.erase(0, temp_note_str.find_first_not_of(" \t\n\r")); // Trim leading whitespace
+    temp_note_str.erase(temp_note_str.find_last_not_of(" \t\n\r") + 1); // Trim trailing whitespace
+
+    if (temp_note_str.empty())
+    {
+        std::cerr << "Error: Empty note string after processing: '" << fullNoteString << "'" << std::endl;
+        return false;
+    }
+
+    // Extract note name, accidental, and octave
+    size_t i = 0;
+    char base_note = temp_note_str[i];
+    if (!((base_note >= 'A' && base_note <= 'G') || (base_note >= 'a' && base_note <= 'g')))
+    {
+        std::cerr << "Error: Invalid base note '" << base_note << "' in '" << fullNoteString << "'" << std::endl;
+        return false;
+    }
+    noteName = std::toupper(base_note); // Convert to uppercase for consistency
+    i++;
+
+    // Check for accidental
+    if (i < temp_note_str.length() && (temp_note_str[i] == '+' || temp_note_str[i] == '-' || temp_note_str[i] == '#' || temp_note_str[i] == 'b'))
+    {
+        accidental = temp_note_str[i];
+        if (accidental == '+')
+            accidental = '#'; // Normalize + to #
+        if (accidental == '-')
+            accidental = 'b'; // Normalize - to b
+        i++;
+    }
+
+    // Extract octave
+    if (i < temp_note_str.length() && std::isdigit(temp_note_str[i]))
+    {
+        std::string octave_str = "";
+        while (i < temp_note_str.length() && std::isdigit(temp_note_str[i]))
+        {
+            octave_str += temp_note_str[i];
+            i++;
+        }
+        octave_for_note = parseInt(octave_str);
+        // Basic validation for octave range
+        if (octave_for_note < 0 || octave_for_note > 8)
+        {
+            std::cerr << "Warning: Explicit octave " << octave_for_note << " in '" << fullNoteString << "' is outside typical range (0-8). Using " << defaultOctave << "." << std::endl;
+            octave_for_note = defaultOctave; // Fallback to default if invalid
+        }
+    }
+    else
+    {
+        // Octave not specified, use default
+        octave_for_note = defaultOctave;
+    }
+
+    // Extract length (if present, e.g., C4L8 or C4/8) - This part needs careful thought
+    // For now, we'll assume length is handled by MML's LENGTH command or explicit duration.
+    // If you want per-note lengths like "C4/8", this logic needs to be added here.
+    // Given the current MML spec, it's `LENGTH:8 sqr:C` or `sqr:C 0.5s`
+
+    // Check for unparsed characters
+    if (i < temp_note_str.length())
+    {
+        // This is where "unrecognized characters 'e' at end of note specification in 'be'" comes from
+        std::cerr << "Warning: Unrecognized characters '" << temp_note_str.substr(i)
+                  << "' at end of note specification in '" << fullNoteString << "'" << std::endl;
+        // This is usually a parsing error.
+    }
+
+    // Length is taken from `defaultLength` unless explicit duration is used.
+    length_for_note = defaultLength;
+
+    return true;
+}
+
+
 // Helper to check if a string looks like an explicit duration (e.g., "1s", "0.5s")
 bool isExplicitDurationToken(const std::string &token)
 {
@@ -409,34 +541,150 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
                 std::cerr << "Warning: Rest duration calculated to be 0 or less for '" << current_token << "'. Skipping." << std::endl;
             }
         }
-        else
-        {                                              // Assume it's a Note/Sound Command (e.g., "sqr:C4", "C4")
-            std::string folderAbbr = command_type_str; // folder is the part before colon or default
-            std::string noteName;
-            char accidental;
-            int length_for_note = 0;
-            int octave_for_note = 0;
-            double explicitDurationSeconds = 0.0;
+        else if (command_type_str == "chord")
+        { // <--- NEW: CHORD Command handling
+            std::cout << "DEBUG: Parsing CHORD: " << command_args_str << std::endl;
+            std::vector<std::string> note_strings = splitString(command_args_str, ','); // Split by commas
 
-            std::cout << " DEBUG: parseNoteCommand received '" << command_args_str << "'" << std::endl; // Debug log
+            std::vector<std::vector<float>> individualNoteAudios;
+            size_t chordDurationSamples = 0; // Will be determined by the first valid note
 
-            if (this->parseNoteCommand(command_args_str, folderAbbr, noteName, accidental,
-                                       length_for_note, octave_for_note, explicitDurationSeconds,
-                                       currentLength, currentOctave))
+            if (note_strings.empty())
+            {
+                std::cerr << "Warning: CHORD command has no notes specified: '" << current_token << "'. Skipping." << std::endl;
+                continue;
+            }
+
+            // Parse each note in the chord
+            for (const std::string &note_str : note_strings)
+            {
+                std::string chord_note_folderAbbr; // Output from parseNoteString
+                std::string chord_note_name;
+                char chord_note_accidental;
+                int chord_note_length;
+                int chord_note_octave;
+                double chord_note_explicitDurationSeconds;
+
+                std::cout << " DEBUG: parseNoteString received '" << note_str << "'" << std::endl; // Debug this full chord note string
+
+                if (this->parseNoteString(note_str, chord_note_folderAbbr, chord_note_name, chord_note_accidental,
+                                          chord_note_length, chord_note_octave, chord_note_explicitDurationSeconds,
+                                          currentLength, currentOctave))
+                { // <-- This brace is crucial for the block
+                    std::vector<float> noteAudio = m_noteDecoder.getNoteAudio(
+                        chord_note_folderAbbr,
+                        chord_note_name,
+                        chord_note_accidental,
+                        chord_note_length,
+                        chord_note_octave,
+                        chord_note_explicitDurationSeconds,
+                        currentTempo);
+
+                    // Apply current global volume to individual note
+                    for (float &sample : noteAudio)
+                    {
+                        sample *= currentVolume;
+                    }
+
+                    if (individualNoteAudios.empty())
+                    { // First note, set chord duration
+                        chordDurationSamples = noteAudio.size();
+                    }
+                    else
+                    {
+                        // Ensure all notes in chord have the same sample count
+                        if (noteAudio.size() != chordDurationSamples)
+                        {
+                            std::cerr << "Warning: Note '" << note_str << "' in chord has different duration ("
+                                      << noteAudio.size() << " samples) than first note ("
+                                      << chordDurationSamples << " samples). Adjusting to chord duration." << std::endl;
+                            noteAudio.resize(chordDurationSamples, 0.0f); // Pad with zeros or truncate
+                        }
+                    }
+                    individualNoteAudios.push_back(noteAudio); // THIS MUST BE HIT!
+                }
+                else
+                {
+                    std::cerr << "Warning: Could not parse note '" << note_str << "' within CHORD. Skipping this note." << std::endl;
+                }
+            } // End of loop through note_strings
+
+            std::cout << "DEBUG: After parsing all chord notes - individualNoteAudios count: " << individualNoteAudios.size()
+                      << ", calculated chordDurationSamples: " << chordDurationSamples << std::endl; // ADD THIS LINE
+
+            // --- Mixing Audio Samples ---
+            if (chordDurationSamples > 0 && !individualNoteAudios.empty())
+            {
+                std::vector<float> mixedChordAudio(chordDurationSamples, 0.0f);
+                float maxAmplitude = 0.0f; // To track for clipping
+
+                for (const auto &noteAudio : individualNoteAudios)
+                {
+                    for (size_t i = 0; i < chordDurationSamples; ++i)
+                    {
+                        mixedChordAudio[i] += noteAudio[i];
+                        // Update max amplitude for clipping detection
+                        if (std::abs(mixedChordAudio[i]) > maxAmplitude)
+                        {
+                            maxAmplitude = std::abs(mixedChordAudio[i]);
+                        }
+                    }
+                }
+
+                // --- Simple Clipping (or add dynamic normalization here if preferred) ---
+                if (maxAmplitude > 1.0f)
+                {
+                    // Option 1: Hard clipping (simpler)
+                    for (float &sample : mixedChordAudio)
+                    {
+                        sample = std::max(-1.0f, std::min(1.0f, sample));
+                    }
+                    // Option 2: Dynamic normalization (better quality)
+                    // float scaleFactor = 1.0f / maxAmplitude;
+                    // for (float& sample : mixedChordAudio) {
+                    //     sample *= scaleFactor;
+                    // }
+                    std::cout << "DEBUG: Chord audio clipped/normalized due to high amplitude." << std::endl;
+                }
+
+                fullAudioOutput.insert(fullAudioOutput.end(), mixedChordAudio.begin(), mixedChordAudio.end());
+            }
+            else
+            {
+                std::cerr << "Warning: No valid notes in CHORD or duration 0. Skipping chord." << std::endl;
+            }
+        } // End of CHORD block
+        else // Normal Note/Sound Command
+        {
+            // Instead of splitting 'sqr:C' into folderAbbr and command_args_str manually,
+            // just pass the full token to parseNoteString.
+            std::string parsed_folderAbbr; // Output from parseNoteString
+            std::string parsed_noteName;
+            char parsed_accidental;
+            int parsed_length_for_note;
+            int parsed_octave_for_note;
+            double parsed_explicitDurationSeconds;
+
+            std::cout << " DEBUG: parseNoteString received '" << current_token << "'" << std::endl; // Debug this full token
+
+            if (this->parseNoteString(current_token, parsed_folderAbbr, parsed_noteName, parsed_accidental,
+                                      parsed_length_for_note, parsed_octave_for_note, parsed_explicitDurationSeconds,
+                                      currentLength, currentOctave))
             {
                 std::vector<float> noteAudio = m_noteDecoder.getNoteAudio(
-                    folderAbbr,
-                    noteName,
-                    accidental,
-                    length_for_note,
-                    octave_for_note,
-                    explicitDurationSeconds,
+                    parsed_folderAbbr, // Use the folder determined by parseNoteString
+                    parsed_noteName,
+                    parsed_accidental,
+                    parsed_length_for_note,
+                    parsed_octave_for_note,
+                    parsed_explicitDurationSeconds,
                     currentTempo);
-                // --- Apply volume to noteAudio samples ---
+
                 for (float &sample : noteAudio)
                 {
                     sample *= currentVolume;
                 }
+
                 fullAudioOutput.insert(fullAudioOutput.end(), noteAudio.begin(), noteAudio.end());
             }
             else
@@ -487,8 +735,6 @@ std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlFilePa
         std::cerr << "Error: debugParseMML could not read MML file: " << mmlFilePath << std::endl;
         return parsedCommands;
     }
-
-    std::cout << "\n--- Debug Parsing MML String from file: '" << mmlFilePath << "' ---" << std::endl;
 
     // --- Apply comment stripping here as well ---
     std::string cleanedMMLString = stripComments(mmlString);
@@ -623,30 +869,58 @@ std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlFilePa
             pCmd.data = parsedRestData;
             pCmd.type = CommandType::REST;
         }
+        else if (command_type_str == "chord")
+        {
+            ParsedChord parsedChordData;
+            std::vector<std::string> note_strings = splitString(command_args_str, ',');
+
+            for (const std::string &note_str : note_strings)
+            {
+                std::string chord_note_folderAbbr;
+                std::string chord_note_name;
+                char chord_note_accidental;
+                int chord_note_length;
+                int chord_note_octave;
+                double chord_note_explicitDurationSeconds;
+
+                if (this->parseNoteString(note_str, chord_note_folderAbbr, chord_note_name, chord_note_accidental,
+                                          chord_note_length, chord_note_octave, chord_note_explicitDurationSeconds,
+                                          currentLength, currentOctave))
+                {
+                    parsedChordData.notes.push_back(ParsedNote{chord_note_folderAbbr, chord_note_name, chord_note_accidental,
+                                                               chord_note_length, chord_note_octave, chord_note_explicitDurationSeconds});
+                }
+                else
+                {
+                    std::cerr << "Warning: Debug: Could not parse note '" << note_str << "' within CHORD for debug output. Skipping." << std::endl;
+                }
+            }
+            pCmd.data = parsedChordData;
+            pCmd.type = CommandType::CHORD;
+        }
         else
         { // Note/Sound Command
             pCmd.type = CommandType::NOTE;
-            std::string folderAbbr = command_type_str;
-            std::string noteName;
-            char accidental;
-            int length_for_note = 0;
-            int octave_for_note = 0;
-            double explicitDurationSeconds = 0.0;
+            std::string parsed_folderAbbr;
+            std::string parsed_noteName;
+            char parsed_accidental;
+            int parsed_length_for_note;
+            int parsed_octave_for_note;
+            double parsed_explicitDurationSeconds;
 
-            if (!this->parseNoteCommand(command_args_str, folderAbbr, noteName, accidental,
-                                        length_for_note, octave_for_note, explicitDurationSeconds,
-                                        currentLength, currentOctave))
+            if (!this->parseNoteString(current_token, parsed_folderAbbr, parsed_noteName, parsed_accidental,
+                                       parsed_length_for_note, parsed_octave_for_note, parsed_explicitDurationSeconds,
+                                       currentLength, currentOctave))
             {
                 std::cerr << "Warning: Debug: Could not parse note command '" << current_token << "'. Marking as UNKNOWN." << std::endl;
                 pCmd.type = CommandType::UNKNOWN;
             }
-            pCmd.data = ParsedNote{folderAbbr, noteName, accidental,
-                                   length_for_note, octave_for_note, explicitDurationSeconds};
+            pCmd.data = ParsedNote{parsed_folderAbbr, parsed_noteName, parsed_accidental,
+                                   parsed_length_for_note, parsed_octave_for_note, parsed_explicitDurationSeconds};
         }
 
         parsedCommands.push_back(pCmd);
     }
 
-    std::cout << "--- Debug Parsing Complete ---" << std::endl;
     return parsedCommands;
 }

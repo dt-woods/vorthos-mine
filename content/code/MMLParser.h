@@ -24,6 +24,7 @@ enum class CommandType
     LENGTH,
     REST,
     VOLUME,
+    CHORD,
     // Add other types if your MML expands
     UNKNOWN
 };
@@ -69,6 +70,11 @@ struct ParsedVolume
     int value; // Volume level, typically 0-100
 };
 
+struct ParsedChord
+{
+    std::vector<ParsedNote> notes; // A vector of individual notes in the chord
+};
+
 // Update ParsedCommand's variant to include new types
 struct ParsedCommand
 {
@@ -76,9 +82,7 @@ struct ParsedCommand
     std::string originalCommandString;
 
     // Add ParsedOctave and ParsedLength to the variant
-    std::variant<ParsedNote, ParsedTempo, ParsedOctave, ParsedLength, ParsedRest, ParsedVolume> data;
-
-    // Removed the helper comment as std::get/std::get_if are standard access methods.
+    std::variant<ParsedNote, ParsedTempo, ParsedOctave, ParsedLength, ParsedRest, ParsedVolume, ParsedChord> data;
 };
 
 // --- End new structs ---
@@ -125,6 +129,16 @@ private:
         int defaultLength, // Input: current default length
         int defaultOctave  // Input: current default octave
     ) const;
+
+    bool parseNoteString(const std::string &fullNoteString,
+                         std::string &folderAbbr,
+                         std::string &noteName,
+                         char &accidental,
+                         int &length_for_note,
+                         int &octave_for_note,
+                         double &explicitDurationSeconds,
+                         int defaultLength,
+                         int defaultOctave);
 };
 
 #endif // MML_PARSER_H

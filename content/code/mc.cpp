@@ -1,5 +1,11 @@
 // main.cpp
 
+// REFERENCES
+// dr_wav.h from dr_lib provided by Mackron
+//   https://mackron.github.io/
+// miniaudio.h provided by Mackron
+//   https://github.com/mackron/miniaudio
+
 #include "AudioUtils.h"
 #include "MMLParser.h"
 #include "NoteDecoder.h"
@@ -43,7 +49,7 @@ int main(int argc, char *argv[])
     // --- Instantiate Parser ---
     MMLParser parser(waveformLibraryPath, 120.0, 4, 4, 100);
 
-    // --- DEBUG PARSING (New Call) ---
+    // --- DEBUG PARSING ---
     std::vector<ParsedCommand> debugOutput = parser.debugParseMML(mmlFilePath);
     for (const auto &cmd : debugOutput)
     {
@@ -81,9 +87,23 @@ int main(int argc, char *argv[])
                       << " }";
         }
         else if (cmd.type == CommandType::VOLUME)
-        { // <--- NEW: VOLUME Debug Output
+        {
             const auto &volume = std::get<ParsedVolume>(cmd.data);
             std::cout << "VOLUME { Value: " << volume.value << "% }";
+        }
+        else if (cmd.type == CommandType::CHORD)
+        { // <--- NEW: CHORD Debug Output
+            const auto &chord = std::get<ParsedChord>(cmd.data);
+            std::cout << "CHORD { Notes: [";
+            bool firstNote = true;
+            for (const auto &note : chord.notes)
+            {
+                if (!firstNote)
+                    std::cout << ", ";
+                std::cout << note.folderAbbr << ":" << note.noteName << note.accidental << note.octave; // Simplified for brevity
+                firstNote = false;
+            }
+            std::cout << "] }";
         }
         else
         {
