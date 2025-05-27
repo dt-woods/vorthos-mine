@@ -15,17 +15,15 @@ std::string readFileIntoString(const std::string &filePath)
 
     if (!inputFileStream.is_open())
     {
-        std::cerr << "Error: Could not open MML file: " << filePath << std::endl;
+        std::cerr << "Error: Could not open file: " << filePath << std::endl;
         return ""; // Return an empty string to indicate failure
     }
 
-    // Read the entire file content into a stringstream
     std::stringstream buffer;
-    buffer << inputFileStream.rdbuf();
+    buffer << inputFileStream.rdbuf(); // Read the entire file content
+    inputFileStream.close();
 
-    inputFileStream.close(); // Close the file stream
-
-    return buffer.str(); // Return the string content
+    return buffer.str();
 }
 
 

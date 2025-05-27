@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
     }
 
     // --- Instantiate Parser ---
-    MMLParser parser(waveformLibraryPath);
+    MMLParser parser(waveformLibraryPath, 120.0, 4, 4, 100);
 
     // --- DEBUG PARSING (New Call) ---
     std::vector<ParsedCommand> debugOutput = parser.debugParseMML(mmlFilePath);
@@ -74,11 +74,16 @@ int main(int argc, char *argv[])
             std::cout << "LENGTH { Value: " << length.value << " }";
         }
         else if (cmd.type == CommandType::REST)
-        { // <--- ADDED REST DEBUG OUTPUT
+        {
             const auto &rest = std::get<ParsedRest>(cmd.data);
             std::cout << "REST { "
                       << (rest.isExplicitDuration ? "Explicit Duration: " + std::to_string(rest.explicitDurationSeconds) + "s" : "Length: " + std::to_string(rest.length))
                       << " }";
+        }
+        else if (cmd.type == CommandType::VOLUME)
+        { // <--- NEW: VOLUME Debug Output
+            const auto &volume = std::get<ParsedVolume>(cmd.data);
+            std::cout << "VOLUME { Value: " << volume.value << "% }";
         }
         else
         {
@@ -86,6 +91,8 @@ int main(int argc, char *argv[])
         }
         std::cout << std::endl;
     }
+
+    // Rest of audio generation
 
     std::cout << "\n--- Generating Audio from " << mmlFilePath << " ---" << std::endl;
 

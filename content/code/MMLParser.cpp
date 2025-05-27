@@ -11,16 +11,17 @@
 MMLParser::MMLParser(const std::string &waveformLibraryPath,
                      double defaultTempoBPM,
                      int defaultOctave,
-                     int defaultLength)
+                     int defaultLength,
+                     int defaultVolume)
     // Initialize member variables in the initializer list
     : m_noteDecoder(waveformLibraryPath), // Initialize the NoteDecoder member here
       m_currentTempoBPM(defaultTempoBPM),
       m_currentOctave(defaultOctave),
-      m_currentLength(defaultLength)
+      m_currentLength(defaultLength),
+      m_currentVolume(static_cast<float>(defaultVolume) / 100.0f) //
 {
-    // Any additional setup if needed
     std::cout << "MMLParser initialized with waveform library: " << waveformLibraryPath << std::endl;
-    std::cout << "Default Tempo: " << m_currentTempoBPM << ", Octave: " << m_currentOctave << ", Length: " << m_currentLength << std::endl;
+    std::cout << "Default Tempo: " << m_currentTempoBPM << ", Octave: " << m_currentOctave << ", Length: " << m_currentLength << ", Volume: " << defaultVolume << "%" << std::endl;
 }
 
 // Helper: splitString (Basic implementation)
@@ -279,13 +280,18 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
     double currentTempo = m_currentTempoBPM; // Start with default BPM
     int currentOctave = m_currentOctave;     // Start with default octave
     int currentLength = m_currentLength;     // Start with default length
+    float currentVolume = m_currentVolume;
 
     std::cout << "Tempo set to: " << currentTempo << " BPM" << std::endl;
     std::cout << "Default octave set to: " << currentOctave << std::endl;
     std::cout << "Default length set to: " << currentLength << std::endl;
+    std::cout << "Default volume set to: " << static_cast<int>(currentVolume * 100) << "%" << std::endl;
+
+    // --- Apply comment stripping here ---
+    std::string cleanedMMLString = stripComments(mmlString);
 
     // --- CRITICAL CHANGE HERE: Use std::stringstream for robust tokenization ---
-    std::stringstream ss(mmlString);
+    std::stringstream ss(cleanedMMLString);
     std::string current_token;
 
     // The loop now correctly extracts tokens separated by any whitespace (including newlines)
@@ -356,6 +362,20 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
                 std::cerr << "Warning: Invalid or unsupported length value '" << command_args_str << "' in LENGTH command. Keeping current default length." << std::endl;
             }
         }
+        else if (command_type_str == "volume")
+        { // <--- NEW: VOLUME Command handling
+            int volume = parseInt(command_args_str);
+            if (volume >= 0 && volume <= 100)
+            {
+                // Scale to 0.0-1.0
+                currentVolume = static_cast<float>(volume) / 100.0f;
+                std::cout << "Volume changed to: " << volume << "%" << std::endl;
+            }
+            else
+            {
+                std::cerr << "Warning: Invalid volume value '" << command_args_str << "'. Volume must be between 0 and 100. Using current volume." << std::endl;
+            }
+        }
         else if (command_type_str == "r")
         { // REST command
             double restDurationSeconds = 0.0;
@@ -412,6 +432,11 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
                     octave_for_note,
                     explicitDurationSeconds,
                     currentTempo);
+                // --- Apply volume to noteAudio samples ---
+                for (float &sample : noteAudio)
+                {
+                    sample *= currentVolume;
+                }
                 fullAudioOutput.insert(fullAudioOutput.end(), noteAudio.begin(), noteAudio.end());
             }
             else
@@ -424,35 +449,63 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
     return fullAudioOutput;
 }
 
-// UPDATED: debugParseMML implementation
+
+// --- NEW: stripComments function implementation ---
+std::string MMLParser::stripComments(const std::string &mmlStringWithComments)
+{
+    std::string cleanedMML;
+    std::stringstream ss_input(mmlStringWithComments);
+    std::string line;
+
+    while (std::getline(ss_input, line))
+    {
+        size_t comment_pos = line.find(';'); // Find the first semicolon on the line
+        if (comment_pos != std::string::npos)
+        {
+            // If a semicolon is found, take only the part before it
+            cleanedMML += line.substr(0, comment_pos);
+        }
+        else
+        {
+            // No semicolon, take the whole line
+            cleanedMML += line;
+        }
+        cleanedMML += " "; // Add a space to separate tokens from different lines
+    }
+    return cleanedMML;
+}
+
+
+// --- debugParseMML Implementation ---
 std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlFilePath)
 {
     std::vector<ParsedCommand> parsedCommands;
-    std::string mmlString = readFileIntoString(mmlFilePath); // <--- Read file content here
+    std::string mmlString = readFileIntoString(mmlFilePath);
 
     if (mmlString.empty())
     {
-        // readFileIntoString already printed an error. Just return empty.
+        std::cerr << "Error: debugParseMML could not read MML file: " << mmlFilePath << std::endl;
         return parsedCommands;
     }
 
     std::cout << "\n--- Debug Parsing MML String from file: '" << mmlFilePath << "' ---" << std::endl;
 
-    // Initialize current state (these will be updated by TEMPO, OCTAVE, LENGTH commands)
+    // --- Apply comment stripping here as well ---
+    std::string cleanedMMLString = stripComments(mmlString);
+
     double currentTempo = 120.0;
     int currentOctave = 4;
     int currentLength = 4;
+    int currentDebugVolume = 100; // Track volume for debug output
 
-    // Tokenize the MML string
-    std::stringstream ss(mmlString);
+    std::stringstream ss(cleanedMMLString);
     std::string current_token;
 
-    // This loop now iterates through tokens parsed from the file content
     while (ss >> current_token)
     {
         ParsedCommand pCmd;
-        pCmd.originalCommandString = current_token; // Store original for debug output
-        CommandType type = CommandType::UNKNOWN;
+        pCmd.originalCommandString = current_token;
+
         std::string command_type_str;
         std::string command_args_str;
 
@@ -464,20 +517,16 @@ std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlFilePa
         }
         else
         {
-            // If no colon, assume it's a note with default folder (e.g., "C4")
-            // This is a simplification for basic MML, adjust if your grammar allows non-colon notes
-            command_type_str = "note"; // A placeholder type to fall into note parsing
+            command_type_str = "sqr";
             command_args_str = current_token;
         }
 
-        // Convert command_type_str to lowercase for case-insensitive comparison
         std::transform(command_type_str.begin(), command_type_str.end(), command_type_str.begin(),
                        [](unsigned char c)
                        { return std::tolower(c); });
 
         if (command_type_str == "tempo")
         {
-            type = CommandType::TEMPO;
             double tempo = parseDouble(command_args_str);
             if (tempo > 0)
             {
@@ -486,30 +535,29 @@ std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlFilePa
             }
             else
             {
-                std::cerr << "Warning: Invalid tempo value '" << command_args_str << "'. Using current tempo." << std::endl;
-                type = CommandType::UNKNOWN; // Mark as unknown if value is invalid
+                std::cerr << "Warning: Debug: Invalid tempo value '" << command_args_str << "'. Using current tempo." << std::endl;
+                pCmd.type = CommandType::UNKNOWN;
             }
+            pCmd.type = CommandType::TEMPO;
         }
         else if (command_type_str == "octave")
         {
-            type = CommandType::OCTAVE;
             int octave = parseInt(command_args_str);
             if (octave >= 0 && octave <= 8)
-            { // Typical MIDI octave range
+            {
                 currentOctave = octave;
                 pCmd.data = ParsedOctave{octave};
             }
             else
             {
-                std::cerr << "Warning: Invalid octave value '" << command_args_str << "'. Using current octave." << std::endl;
-                type = CommandType::UNKNOWN;
+                std::cerr << "Warning: Debug: Invalid octave value '" << command_args_str << "'. Using current octave." << std::endl;
+                pCmd.type = CommandType::UNKNOWN;
             }
+            pCmd.type = CommandType::OCTAVE;
         }
         else if (command_type_str == "length")
         {
-            type = CommandType::LENGTH;
             int length = parseInt(command_args_str);
-            // Valid common lengths for musical notes
             if (length > 0 && (length == 1 || length == 2 || length == 4 || length == 8 || length == 16 || length == 32 || length == 64))
             {
                 currentLength = length;
@@ -517,13 +565,29 @@ std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlFilePa
             }
             else
             {
-                std::cerr << "Warning: Invalid length value '" << command_args_str << "'. Using current length." << std::endl;
-                type = CommandType::UNKNOWN;
+                std::cerr << "Warning: Debug: Invalid or unsupported length value '" << command_args_str << "' in LENGTH command. Keeping current default length." << std::endl;
+                pCmd.type = CommandType::UNKNOWN;
             }
+            pCmd.type = CommandType::LENGTH;
+        }
+        else if (command_type_str == "volume")
+        { // <--- NEW: VOLUME Debug Handling
+            int volume = parseInt(command_args_str);
+            if (volume >= 0 && volume <= 100)
+            {
+                currentDebugVolume = volume; // Update debug tracker
+                pCmd.data = ParsedVolume{volume};
+            }
+            else
+            {
+                std::cerr << "Warning: Debug: Invalid volume value '" << command_args_str << "'. Volume must be between 0 and 100. Marking as UNKNOWN." << std::endl;
+                pCmd.type = CommandType::UNKNOWN;
+            }
+            pCmd.type = CommandType::VOLUME;
         }
         else if (command_type_str == "r")
-        { // REST command
-            type = CommandType::REST;
+        {
+            // ... (rest handling remains the same) ...
             ParsedRest parsedRestData;
             parsedRestData.isExplicitDuration = false;
             parsedRestData.length = 0;
@@ -540,7 +604,7 @@ std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlFilePa
                 else
                 {
                     std::cerr << "Warning: Debug: Invalid or non-positive explicit rest duration '" << command_args_str << "' in 'r:' command. Marking as UNKNOWN." << std::endl;
-                    type = CommandType::UNKNOWN;
+                    pCmd.type = CommandType::UNKNOWN;
                 }
             }
             else
@@ -553,42 +617,35 @@ std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlFilePa
                 else
                 {
                     std::cerr << "Warning: Debug: Invalid or unsupported rest length '" << command_args_str << "' in 'r:' command. Marking as UNKNOWN." << std::endl;
-                    type = CommandType::UNKNOWN;
+                    pCmd.type = CommandType::UNKNOWN;
                 }
             }
-            pCmd.data = parsedRestData; // Assign rest data whether valid or not (type is UNKNOWN if invalid)
+            pCmd.data = parsedRestData;
+            pCmd.type = CommandType::REST;
         }
         else
-        { // Assume it's a Note/Sound Command (e.g., "sqr:C4", "tri:D+")
-            type = CommandType::NOTE;
-            std::string folderAbbr = command_type_str; // folder is the part before colon
+        { // Note/Sound Command
+            pCmd.type = CommandType::NOTE;
+            std::string folderAbbr = command_type_str;
             std::string noteName;
             char accidental;
             int length_for_note = 0;
             int octave_for_note = 0;
             double explicitDurationSeconds = 0.0;
 
-            // Call parseNoteCommand - assumes it's a standalone function or member
-            // If parseNoteCommand is a private member, you'll need to call it with `this->`
-            // If it's a non-member helper, ensure it's accessible.
-            // For now, let's assume it's a private member function that handles parsing.
-            // This is the function that parses "C4" or "D+ 1s"
             if (!this->parseNoteCommand(command_args_str, folderAbbr, noteName, accidental,
                                         length_for_note, octave_for_note, explicitDurationSeconds,
                                         currentLength, currentOctave))
             {
-                std::cerr << "Warning: Could not parse note command '" << current_token << "'. Marking as UNKNOWN." << std::endl;
-                type = CommandType::UNKNOWN;
+                std::cerr << "Warning: Debug: Could not parse note command '" << current_token << "'. Marking as UNKNOWN." << std::endl;
+                pCmd.type = CommandType::UNKNOWN;
             }
-            // Populate ParsedNote
             pCmd.data = ParsedNote{folderAbbr, noteName, accidental,
                                    length_for_note, octave_for_note, explicitDurationSeconds};
         }
 
-        pCmd.type = type;               // Set the determined command type
-        parsedCommands.push_back(pCmd); // Add to our list
-
-    } // End while loop
+        parsedCommands.push_back(pCmd);
+    }
 
     std::cout << "--- Debug Parsing Complete ---" << std::endl;
     return parsedCommands;

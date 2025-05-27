@@ -23,7 +23,8 @@ enum class CommandType
     OCTAVE,
     LENGTH,
     REST,
-    // Add other types if your MML expands (e.g., VOLUME)
+    VOLUME,
+    // Add other types if your MML expands
     UNKNOWN
 };
 
@@ -63,6 +64,11 @@ struct ParsedRest
     bool isExplicitDuration;        // True if explicitDurationSeconds is used
 };
 
+struct ParsedVolume
+{
+    int value; // Volume level, typically 0-100
+};
+
 // Update ParsedCommand's variant to include new types
 struct ParsedCommand
 {
@@ -70,7 +76,7 @@ struct ParsedCommand
     std::string originalCommandString;
 
     // Add ParsedOctave and ParsedLength to the variant
-    std::variant<ParsedNote, ParsedTempo, ParsedOctave, ParsedLength, ParsedRest> data;
+    std::variant<ParsedNote, ParsedTempo, ParsedOctave, ParsedLength, ParsedRest, ParsedVolume> data;
 
     // Removed the helper comment as std::get/std::get_if are standard access methods.
 };
@@ -83,8 +89,10 @@ public:
     // Constructor: Takes the base path for waveforms and default global settings
     MMLParser(const std::string &waveformLibraryPath,
               double defaultTempoBPM = 120.0,
-              int defaultOctave = 4,  // New default for initial octave
-              int defaultLength = 4); // New default for initial length (e.g., quarter note)
+              int defaultOctave = 4, // default for initial octave
+              int defaultLength = 4, // default length (e.g., quarter note)
+              int defaultVolume = 100
+    );
 
     std::vector<float> parseMML(const std::string &mmlString);
     // UPDATED: debugParseMML now takes a file path
@@ -97,8 +105,10 @@ private:
     double m_currentTempoBPM;
     int m_currentOctave; // Tracks the current default octave
     int m_currentLength; // Tracks the current default length
+    float m_currentVolume; // Store current volume as a float
 
     // Helper functions (declarations)
+    std::string stripComments(const std::string &mmlStringWithComments);
     std::vector<std::string> splitString(const std::string &s, char delimiter) const;
     int parseInt(const std::string &s, int defaultValue = 0) const;
     double parseDouble(const std::string &s, double defaultValue = 0.0) const;
