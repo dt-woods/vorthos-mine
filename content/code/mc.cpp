@@ -1,91 +1,133 @@
 // main.cpp
 
+#include "AudioUtils.h"
 #include "MMLParser.h"
+#include "NoteDecoder.h"
 #include <iostream>
-#include <fstream>
-#include <vector>
-#include <string>
-#include <variant> // Required for std::visit
+#include <fstream> // Required for file operations
 
-// Helper to write raw PCM file (for actual audio testing)
-void write_pcm_file(const std::string &filename, const std::vector<float> &audio_data)
+// COMPILE:
+// g++ main.cpp MMLParser.cpp NoteDecoder.cpp AudioUtils.cpp -o mml_player -lsndfile -std=c++17
+// USE:
+// ./mml_player /path/to/your/waveform/library song.mml
+int main(int argc, char *argv[])
 {
-    std::ofstream outfile(filename, std::ios::binary);
-    if (!outfile)
-    {
-        std::cerr << "Error opening output file: " << filename << std::endl;
-        return;
+    // --- Parse Command Line Arguments ---
+    if (argc < 3)
+    { // Now expecting at least 3 arguments: program_name, waveform_path, mml_file_path
+        std::cerr << "Usage: " << argv[0] << " <waveform_library_path> <mml_file_path> [output_pcm_filename]" << std::endl;
+        return 1;
     }
-    outfile.write(reinterpret_cast<const char *>(audio_data.data()), audio_data.size() * sizeof(float));
-    outfile.close();
-    std::cout << "Audio data written to " << filename << " (raw float)." << std::endl;
-}
 
-int main()
-{
-    // IMPORTANT: Replace with the actual base path to your waveform library!
-    const std::string waveformLibraryPath = "/path/to/your/waveform/library"; // <--- CHANGE THIS!
+    std::string waveformLibraryPath = argv[1]; // First argument is the waveform library path
 
-    try
-    {
-        // Initialize parser with default settings (e.g., o4, length 4)
-        MMLParser parser(waveformLibraryPath, 120.0, 4, 4);
-
-        // --- Test MML Strings (UPDATED FOR NEW SYNTAX) ---
-        std::string mml1 = "TEMPO:150 OCTAVE:5 LENGTH:8 sqr:A tri:C+ X:kick01 1s";       // A and C+ should be o5, length 8
-        std::string mml2 = "TEMPO:90 imp:G+2o3 4s noise:white1s 1s";                     // G+ should be o3, length 2
-        std::string mml3 = "OCTAVE:3 LENGTH:16 sqr:C tri:E+o4 imp:G- 0.5s";              // C should be o3, length 16. E+ should be o4, length 16. G- explicit duration.
-        std::string mml4 = "invalid_command sqr:A+4o4o4 TEMPO:abc OCTAVE:xyz LENGTH:1s"; // Test invalid/malformed commands
-        std::string mml5 = "sqr:C tri:D+ imp:E-";                                        // Should use initial defaults (o4, length 4)
-
-        std::vector<std::string> testMMLs = {mml1, mml2, mml3, mml4, mml5};
-
-        for (int i = 0; i < testMMLs.size(); ++i)
-        {
-            std::cout << "\n--- Debug Parsing MML String " << (i + 1) << ": '" << testMMLs[i] << "' ---" << std::endl;
-            std::vector<ParsedCommand> commands = parser.debugParseMML(testMMLs[i]);
-
-            for (const auto &cmd : commands)
-            {
-                std::cout << "  Original: '" << cmd.originalCommandString << "' -> ";
-
-                // Use std::visit to safely access variant data
-                std::visit([&](auto &&arg)
-                           {
-                    using T = std::decay_t<decltype(arg)>;
-                    if constexpr (std::is_same_v<T, ParsedNote>) {
-                        std::cout << "NOTE { Folder: " << arg.folderAbbr
-                                  << ", Name: " << arg.noteName
-                                  << ", Accidental: '" << (arg.accidental == ' ' ? "natural" : std::string(1, arg.accidental)) << "'"
-                                  << ", Length: " << arg.length
-                                  << ", Octave: " << arg.octave
-                                  << ", Explicit Duration: " << arg.explicitDurationSeconds << "s }";
-                    } else if constexpr (std::is_same_v<T, ParsedTempo>) {
-                        std::cout << "TEMPO { Value: " << arg.value << " BPM }";
-                    } else if constexpr (std::is_same_v<T, ParsedOctave>) { // New output for Octave
-                        std::cout << "OCTAVE { Value: " << arg.value << " }";
-                    } else if constexpr (std::is_same_v<T, ParsedLength>) { // New output for Length
-                        std::cout << "LENGTH { Value: " << arg.value << " }";
-                    } }, cmd.data);
-
-                if (cmd.type == CommandType::UNKNOWN)
-                { // Handle UNKNOWN explicitly if variant isn't handled for it
-                    std::cout << "UNKNOWN COMMAND";
-                }
-                std::cout << std::endl;
-            }
+    // --- Normalize waveformLibraryPath: remove trailing slash if present ---
+    if (!waveformLibraryPath.empty())
+    {                                               // Ensure the string is not empty
+        char lastChar = waveformLibraryPath.back(); // Get the last character
+        if (lastChar == '/' || lastChar == '\\')
+        {                                   // Check for both forward and backward slashes
+            waveformLibraryPath.pop_back(); // Remove the last character
+            std::cout << "Normalized waveformLibraryPath to: " << waveformLibraryPath << std::endl;
         }
-
-        // Example of actual audio generation (uncomment and test if you wish)
-        // std::cout << "\n--- Generating Audio for mml1 ---" << std::endl;
-        // std::vector<float> final_audio = parser.parseMML(mml1);
-        // if (!final_audio.empty()) {
-        //     write_pcm_file("mml1_output.pcm", final_audio);
-        // }
     }
-    catch (const std::exception &e)
+
+    std::string mmlFilePath = argv[2];                  // Second argument is the MML file path
+    std::string outputPcmFilename = "output_audio.pcm"; // Default output filename
+
+    if (argc > 3)
+    { // If there's a third argument, it's the custom output filename
+        outputPcmFilename = argv[3];
+    }
+
+    // --- Instantiate Parser ---
+    MMLParser parser(waveformLibraryPath);
+
+    // --- DEBUG PARSING (New Call) ---
+    std::vector<ParsedCommand> debugOutput = parser.debugParseMML(mmlFilePath);
+    for (const auto &cmd : debugOutput)
     {
-        std::cerr << "An unhandled error occurred: " << e.what() << std::endl;
+        std::cout << "Original: '" << cmd.originalCommandString << "' -> ";
+        if (cmd.type == CommandType::NOTE)
+        {
+            const auto &note = std::get<ParsedNote>(cmd.data);
+            std::cout << "NOTE { Folder: " << note.folderAbbr
+                      << ", Name: " << note.noteName
+                      << ", Accidental: '" << note.accidental
+                      << "', Length: " << note.length
+                      << ", Octave: " << note.octave
+                      << ", Explicit Duration: " << note.explicitDurationSeconds << "s }";
+        }
+        else if (cmd.type == CommandType::TEMPO)
+        {
+            const auto &tempo = std::get<ParsedTempo>(cmd.data);
+            std::cout << "TEMPO { BPM: " << tempo.value << " }";
+        }
+        else if (cmd.type == CommandType::OCTAVE)
+        {
+            const auto &octave = std::get<ParsedOctave>(cmd.data);
+            std::cout << "OCTAVE { Value: " << octave.value << " }";
+        }
+        else if (cmd.type == CommandType::LENGTH)
+        {
+            const auto &length = std::get<ParsedLength>(cmd.data);
+            std::cout << "LENGTH { Value: " << length.value << " }";
+        }
+        else if (cmd.type == CommandType::REST)
+        { // <--- ADDED REST DEBUG OUTPUT
+            const auto &rest = std::get<ParsedRest>(cmd.data);
+            std::cout << "REST { "
+                      << (rest.isExplicitDuration ? "Explicit Duration: " + std::to_string(rest.explicitDurationSeconds) + "s" : "Length: " + std::to_string(rest.length))
+                      << " }";
+        }
+        else
+        {
+            std::cout << "UNKNOWN Command";
+        }
+        std::cout << std::endl;
+    }
+
+    std::cout << "\n--- Generating Audio from " << mmlFilePath << " ---" << std::endl;
+
+    // --- Generate Audio ---
+    // Read MML from file *again* for parseMML (or you could modify parseMML to take path too, but often easier to reuse readFileIntoString)
+    std::string mmlStringForAudio = readFileIntoString(mmlFilePath);
+    if (mmlStringForAudio.empty())
+    {
+        std::cerr << "Failed to read MML for audio generation." << std::endl;
+        return 1;
+    }
+
+    std::vector<float> audioOutput = parser.parseMML(mmlStringForAudio); // Pass the string here
+
+    // --- Read MML from file ---
+    std::string mmlString = readFileIntoString(mmlFilePath);
+    if (mmlString.empty())
+    {
+        // readFileIntoString already prints an error message
+        return 1;
+    }
+
+    std::cout << "--- Parsing MML from " << mmlFilePath << " ---" << std::endl;
+
+    if (audioOutput.empty())
+    {
+        std::cerr << "Parsing generated no audio data." << std::endl;
+        return 1;
+    }
+
+    // --- Save Audio to PCM File ---
+    if (saveToPcmFile(audioOutput, outputPcmFilename))
+    {
+        std::cout << "Audio saved to " << outputPcmFilename << std::endl;
+        std::cout << "To play or convert this raw PCM file, you might use tools like FFmpeg or Audacity:" << std::endl;
+        std::cout << "  Using FFmpeg: ffmpeg -f f32le -ar " << SAMPLE_RATE << " -ac 1 -i " << outputPcmFilename << " output_audio.wav" << std::endl;
+        std::cout << "  (Note: f32le is 32-bit float, little-endian; -ac 1 assumes mono.)" << std::endl;
+        std::cout << "  Using Audacity: File > Import > Raw Data... then specify Sample Rate (" << SAMPLE_RATE << " Hz), Format (32-bit float), Channels (1 Mono)." << std::endl;
+    }
+    else
+    {
+        std::cerr << "Failed to save audio to PCM file." << std::endl;
         return 1;
     }
 
