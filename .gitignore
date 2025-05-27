@@ -11,3 +11,9 @@ Desktop.ini
 # Ignore binary audio
 *.pcm
 *.mp3
+
+# Ignore public C++ headers
+#   https://github.com/mackron/dr_libs
+#   https://github.com/mackron/miniaudio
+dr_wav.h
+miniaudio.h
