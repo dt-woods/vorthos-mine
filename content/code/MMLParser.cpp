@@ -245,9 +245,9 @@ bool MMLParser::parseNoteCommand(
 bool MMLParser::parseNoteString(const std::string &fullNoteString,
                                 std::string &folderAbbr,
                                 std::string &noteName, // This will be the full drum name if X folder
-                                char &accidental,      // Unused for non-pitched, but initialized
-                                int &length_for_note,  // Default, unused for non-pitched, but initialized
-                                int &octave_for_note,  // Default, unused for non-pitched, but initialized
+                                char &accidental,
+                                int &length_for_note,
+                                int &octave_for_note,
                                 double &explicitDurationSeconds,
                                 int defaultLength,
                                 int defaultOctave)
@@ -314,7 +314,7 @@ bool MMLParser::parseNoteString(const std::string &fullNoteString,
         return false;
     }
 
-    // --- CRITICAL MODIFICATION: Special handling for non-pitched instruments (like 'X') ---
+    // --- Special handling for non-pitched instruments (like 'X') ---
     // If the folder abbreviation is one of the non-pitched types,
     // the entire 'temp_note_str' is the sound's name (e.g., "bass03", "snare01").
     if (folderAbbr == "x" || folderAbbr == "noise" || folderAbbr == "miscellaneous" || folderAbbr == "sk-5")
@@ -351,7 +351,9 @@ bool MMLParser::parseNoteString(const std::string &fullNoteString,
         i++;
     }
 
-    // Extract octave
+    // NO MORE NOTE-SPECIFIC LENGTH; MUST BE SET USING GLOBAL!
+
+    // Extract octave (does not require 'o' anymore)
     if (i < temp_note_str.length() && std::isdigit(temp_note_str[i]))
     {
         std::string octave_str = "";
@@ -475,6 +477,32 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
                        [](unsigned char c)
                        { return std::tolower(c); });
 
+        // --- LOOK-AHEAD LOGIC FOR OPTIONAL EXPLICIT DURATION ---
+        // Moved here to allow both CHORD and note explicit duration
+        std::string next_token_candidate;
+        std::streampos current_iss_pos = ss.tellg(); // Save current stream position
+
+        // Try to read the next token from the stream
+        if (ss >> next_token_candidate)
+        {
+            // *** USE THE HELPER METHOD HERE ***
+            if (isExplicitDurationToken(next_token_candidate)) // Check if it's a valid explicit duration token
+            {
+                // If it's a valid duration, append it to the full note specification.
+                // The 'ss >> next_token_candidate' already consumed it, so no rewind needed.
+                command_args_str += " " + next_token_candidate;
+            }
+            else
+            {
+                // Not an explicit duration, put the token back into the stream
+                ss.seekg(current_iss_pos); // Rewind the stream
+            }
+        }
+        // If ss >> next_token_candidate failed (e.g., end of stream),
+        // full_note_spec remains just the first token, which is correct.
+
+        // --- END OF LOOK-AHEAD LOGIC ---
+
         if (command_type_str == "tempo")
         {
             double tempo = parseDouble(command_args_str);
@@ -562,42 +590,92 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
             }
         }
         else if (command_type_str == "chord")
-        { // <--- NEW: CHORD Command handling
+        { // <--- CHORD Command handling
             std::cout << "DEBUG: Parsing CHORD: " << command_args_str << std::endl;
-            std::vector<std::string> note_strings = splitString(command_args_str, ','); // Split by commas
+
+            double chord_explicitDurationSeconds = 0.0;    // Default to 0.0, indicating no explicit duration
+            std::string notes_only_str = command_args_str; // Will hold just the comma-separated notes
+
+            // --- Step 1: Attempt to extract explicit duration from the end of the chord argument string ---
+            size_t s_pos = notes_only_str.find_last_of('s');
+            // Check if 's' is found and there's a number before it
+            if (s_pos != std::string::npos && s_pos > 0 && notes_only_str[s_pos - 1] != ' ')
+            {
+                // Find the last space before 's', which should separate the notes from the duration
+                size_t space_before_s_or_start = notes_only_str.rfind(' ', s_pos);
+
+                // If a space is found, the duration string starts after it. Otherwise, duration starts at the beginning.
+                size_t duration_start_pos = (space_before_s_or_start == std::string::npos) ? 0 : space_before_s_or_start + 1;
+
+                if (duration_start_pos < s_pos) // Ensure there's content for a number
+                {
+                    std::string duration_str = notes_only_str.substr(duration_start_pos, s_pos - duration_start_pos);
+                    try
+                    {
+                        chord_explicitDurationSeconds = std::stod(duration_str);
+                        // Successfully parsed duration, now remove it from the string
+                        notes_only_str = notes_only_str.substr(0, duration_start_pos);
+                        // Trim any trailing whitespace left by removing the duration
+                        notes_only_str.erase(notes_only_str.find_last_not_of(" \t\n\r\f\v") + 1);
+                        std::cout << "DEBUG: Chord explicit duration found: " << chord_explicitDurationSeconds << "s" << std::endl;
+                    }
+                    catch (const std::invalid_argument &e)
+                    {
+                        std::cerr << "Warning: Invalid explicit duration format for chord '" << duration_str << "'. Ignoring." << std::endl;
+                        chord_explicitDurationSeconds = 0.0; // Reset to default if parsing failed
+                    }
+                    catch (const std::out_of_range &e)
+                    {
+                        std::cerr << "Warning: Explicit duration for chord '" << duration_str << "' out of range. Ignoring." << std::endl;
+                        chord_explicitDurationSeconds = 0.0; // Reset to default if parsing failed
+                    }
+                }
+            }
+
+            // --- Step 2: Split the remaining string (which now only contains notes) by commas ---
+            std::vector<std::string> note_strings = splitString(notes_only_str, ',');
 
             std::vector<std::vector<float>> individualNoteAudios;
-            size_t chordDurationSamples = 0; // Will be determined by the first valid note
+            size_t chordDurationSamples = 0; // Will now be determined consistently
 
             if (note_strings.empty())
             {
-                std::cerr << "Warning: CHORD command has no notes specified: '" << current_token << "'. Skipping." << std::endl;
+                std::cerr << "Warning: CHORD command has no notes specified after parsing duration: '" << current_token << "'. Skipping." << std::endl;
                 continue;
             }
 
-            // Parse each note in the chord
-            for (const std::string &note_str : note_strings)
+            // --- Step 3: Parse each note and generate audio, applying the chord-level duration ---
+            for (const std::string &note_str_raw : note_strings)
             {
-                std::string chord_note_folderAbbr; // Output from parseNoteString
+                // Trim whitespace from individual note string parts
+                std::string note_str = note_str_raw;
+                note_str.erase(0, note_str.find_first_not_of(" \t\n\r\f\v"));
+                note_str.erase(note_str.find_last_not_of(" \t\n\r\f\v") + 1);
+
+                if (note_str.empty())
+                    continue; // Skip empty strings resulting from multiple commas or leading/trailing commas
+
+                std::string chord_note_folderAbbr;
                 std::string chord_note_name;
                 char chord_note_accidental;
                 int chord_note_length;
                 int chord_note_octave;
-                double chord_note_explicitDurationSeconds;
+                double dummy_explicitDurationSeconds; // This will capture any explicit duration within an individual note,
+                                                      // but it will be *ignored* in favor of chord_explicitDurationSeconds.
 
-                std::cout << " DEBUG: parseNoteString received '" << note_str << "'" << std::endl; // Debug this full chord note string
+                std::cout << " DEBUG: parseNoteString received '" << note_str << "'" << std::endl;
 
                 if (this->parseNoteString(note_str, chord_note_folderAbbr, chord_note_name, chord_note_accidental,
-                                          chord_note_length, chord_note_octave, chord_note_explicitDurationSeconds,
+                                          chord_note_length, chord_note_octave, dummy_explicitDurationSeconds,
                                           currentLength, currentOctave))
-                { // <-- This brace is crucial for the block
+                {
                     std::vector<float> noteAudio = m_noteDecoder.getNoteAudio(
                         chord_note_folderAbbr,
                         chord_note_name,
                         chord_note_accidental,
                         chord_note_length,
                         chord_note_octave,
-                        chord_note_explicitDurationSeconds,
+                        chord_explicitDurationSeconds, // <--- CRITICAL CHANGE: Use the CHORD-level explicit duration here!
                         currentTempo);
 
                     // Apply current global volume to individual note
@@ -606,22 +684,14 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
                         sample *= currentVolume;
                     }
 
-                    if (individualNoteAudios.empty())
-                    { // First note, set chord duration
+                    // All notes in the chord will now have the same duration (either explicit or derived from length)
+                    // We only need to set the chordDurationSamples once from the first note's size.
+                    if (chordDurationSamples == 0)
+                    {
                         chordDurationSamples = noteAudio.size();
                     }
-                    else
-                    {
-                        // Ensure all notes in chord have the same sample count
-                        if (noteAudio.size() != chordDurationSamples)
-                        {
-                            std::cerr << "Warning: Note '" << note_str << "' in chord has different duration ("
-                                      << noteAudio.size() << " samples) than first note ("
-                                      << chordDurationSamples << " samples). Adjusting to chord duration." << std::endl;
-                            noteAudio.resize(chordDurationSamples, 0.0f); // Pad with zeros or truncate
-                        }
-                    }
-                    individualNoteAudios.push_back(noteAudio); // THIS MUST BE HIT!
+
+                    individualNoteAudios.push_back(noteAudio);
                 }
                 else
                 {
@@ -640,7 +710,9 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
 
                 for (const auto &noteAudio : individualNoteAudios)
                 {
-                    for (size_t i = 0; i < chordDurationSamples; ++i)
+                    // Ensure noteAudio has enough samples for chordDurationSamples (should be consistent now)
+                    size_t currentNoteAudioSize = noteAudio.size();
+                    for (size_t i = 0; i < std::min(chordDurationSamples, currentNoteAudioSize); ++i)
                     {
                         mixedChordAudio[i] += noteAudio[i];
                         // Update max amplitude for clipping detection
@@ -659,7 +731,7 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
                     {
                         sample = std::max(-1.0f, std::min(1.0f, sample));
                     }
-                    // Option 2: Dynamic normalization (better quality)
+                    // Option 2: Dynamic normalization (better quality) - uncomment if preferred
                     // float scaleFactor = 1.0f / maxAmplitude;
                     // for (float& sample : mixedChordAudio) {
                     //     sample *= scaleFactor;
@@ -676,32 +748,7 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
         } // End of CHORD block
         else
         { // This is a potential Note/Sound Command (e.g., "X:bass03", "tri:C4")
-            std::string full_note_spec = current_token; // Start with the first token (e.g., "X:bass03")
 
-            // --- LOOK-AHEAD LOGIC FOR OPTIONAL EXPLICIT DURATION ---
-            std::string next_token_candidate;
-            std::streampos current_iss_pos = ss.tellg(); // Save current stream position
-
-            // Try to read the next token from the stream
-            if (ss >> next_token_candidate)
-            {
-                // *** USE THE HELPER METHOD HERE ***
-                if (isExplicitDurationToken(next_token_candidate)) // Check if it's a valid explicit duration token
-                {
-                    // If it's a valid duration, append it to the full note specification.
-                    // The 'ss >> next_token_candidate' already consumed it, so no rewind needed.
-                    full_note_spec += " " + next_token_candidate;
-                }
-                else
-                {
-                    // Not an explicit duration, put the token back into the stream
-                    ss.seekg(current_iss_pos); // Rewind the stream
-                }
-            }
-            // If ss >> next_token_candidate failed (e.g., end of stream),
-            // full_note_spec remains just the first token, which is correct.
-
-            // --- END OF LOOK-AHEAD LOGIC ---
 
             // Now, parseNoteString receives the complete note specification,
             // including the explicit duration if one was found and appended.
@@ -712,9 +759,9 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
             int parsed_octave_for_note;
             double parsed_explicitDurationSeconds;
 
-            std::cout << " DEBUG: parseNoteString received '" << full_note_spec << "'" << std::endl;
+            std::cout << " DEBUG: parseNoteString received '" << command_args_str << "'" << std::endl;
 
-            if (this->parseNoteString(full_note_spec, parsed_folderAbbr, parsed_noteName, parsed_accidental,
+            if (this->parseNoteString(command_args_str, parsed_folderAbbr, parsed_noteName, parsed_accidental,
                                       parsed_length_for_note, parsed_octave_for_note, parsed_explicitDurationSeconds,
                                       currentLength, currentOctave)) // HOTFIX
             {
@@ -736,7 +783,7 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
             }
             else
             {
-                std::cerr << "Error: Could not parse note command '" << full_note_spec << "'. Skipping." << std::endl;
+                std::cerr << "Error: Could not parse note command '" << command_args_str << "'. Skipping." << std::endl;
             }
         }
     }
@@ -813,6 +860,31 @@ std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlFilePa
             command_args_str = current_token;
         }
 
+        // --- LOOK-AHEAD LOGIC FOR OPTIONAL EXPLICIT DURATION ---
+        std::string next_token_candidate;
+        std::streampos current_iss_pos = ss.tellg(); // Save current stream position
+
+        // Try to read the next token from the stream
+        if (ss >> next_token_candidate)
+        {
+            // *** USE THE HELPER METHOD HERE ***
+            if (isExplicitDurationToken(next_token_candidate)) // Check if it's a valid explicit duration token
+            {
+                // If it's a valid duration, append it to the full note specification.
+                // The 'ss >> next_token_candidate' already consumed it, so no rewind needed.
+                command_args_str += " " + next_token_candidate;
+            }
+            else
+            {
+                // Not an explicit duration, put the token back into the stream
+                ss.seekg(current_iss_pos); // Rewind the stream
+            }
+        }
+        // If ss >> next_token_candidate failed (e.g., end of stream),
+        // full_note_spec remains just the first token, which is correct.
+
+        // --- END OF LOOK-AHEAD LOGIC ---
+
         std::transform(command_type_str.begin(), command_type_str.end(), command_type_str.begin(),
                        [](unsigned char c)
                        { return std::tolower(c); });
@@ -863,7 +935,7 @@ std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlFilePa
             pCmd.type = CommandType::LENGTH;
         }
         else if (command_type_str == "volume")
-        { // <--- NEW: VOLUME Debug Handling
+        { // <--- VOLUME Debug Handling
             int volume = parseInt(command_args_str);
             if (volume >= 0 && volume <= 100)
             {
@@ -945,34 +1017,6 @@ std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlFilePa
         }
         else
         { // Note/Sound Command
-
-            std::string full_note_spec = current_token; // Start with the first token (e.g., "X:bass03")
-
-            // --- LOOK-AHEAD LOGIC FOR OPTIONAL EXPLICIT DURATION ---
-            std::string next_token_candidate;
-            std::streampos current_iss_pos = ss.tellg(); // Save current stream position
-
-            // Try to read the next token from the stream
-            if (ss >> next_token_candidate)
-            {
-                // *** USE THE HELPER METHOD HERE ***
-                if (isExplicitDurationToken(next_token_candidate)) // Check if it's a valid explicit duration token
-                {
-                    // If it's a valid duration, append it to the full note specification.
-                    // The 'ss >> next_token_candidate' already consumed it, so no rewind needed.
-                    full_note_spec += " " + next_token_candidate;
-                }
-                else
-                {
-                    // Not an explicit duration, put the token back into the stream
-                    ss.seekg(current_iss_pos); // Rewind the stream
-                }
-            }
-            // If ss >> next_token_candidate failed (e.g., end of stream),
-            // full_note_spec remains just the first token, which is correct.
-
-            // --- END OF LOOK-AHEAD LOGIC ---
-
             pCmd.type = CommandType::NOTE;
             std::string parsed_folderAbbr;
             std::string parsed_noteName;
@@ -981,7 +1025,7 @@ std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlFilePa
             int parsed_octave_for_note;
             double parsed_explicitDurationSeconds;
 
-            if (!this->parseNoteString(full_note_spec, parsed_folderAbbr, parsed_noteName, parsed_accidental,
+            if (!this->parseNoteString(command_args_str, parsed_folderAbbr, parsed_noteName, parsed_accidental,
                                        parsed_length_for_note, parsed_octave_for_note, parsed_explicitDurationSeconds,
                                        currentLength, currentOctave))
             {

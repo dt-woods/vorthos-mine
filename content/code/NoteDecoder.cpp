@@ -353,11 +353,6 @@ std::vector<float> NoteDecoder::getNoteAudio(
         std::cout << "Using natural sample duration: " << targetDurationSeconds << "s" << std::endl; // For debugging
     }
 
-    // --- ADD THIS DEBUG LINE ---
-    std::cout << "Calculated target duration for " << folderAbbr << ":" << noteName
-              << " (L=" << length << "): " << targetDurationSeconds << "s" << std::endl;
-    // --- END DEBUG LINE ---
-
     // Ensure target duration is positive
     if (targetDurationSeconds <= 0)
     {
