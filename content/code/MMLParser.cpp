@@ -674,46 +674,72 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
                 std::cerr << "Warning: No valid notes in CHORD or duration 0. Skipping chord." << std::endl;
             }
         } // End of CHORD block
-        else // Normal Note/Sound Command
-        {
-            // Instead of splitting 'sqr:C' into folderAbbr and command_args_str manually,
-            // just pass the full token to parseNoteString.
-            std::string parsed_folderAbbr; // Output from parseNoteString
+        else
+        { // This is a potential Note/Sound Command (e.g., "X:bass03", "tri:C4")
+            std::string full_note_spec = current_token; // Start with the first token (e.g., "X:bass03")
+
+            // --- LOOK-AHEAD LOGIC FOR OPTIONAL EXPLICIT DURATION ---
+            std::string next_token_candidate;
+            std::streampos current_iss_pos = ss.tellg(); // Save current stream position
+
+            // Try to read the next token from the stream
+            if (ss >> next_token_candidate)
+            {
+                // *** USE THE HELPER METHOD HERE ***
+                if (isExplicitDurationToken(next_token_candidate)) // Check if it's a valid explicit duration token
+                {
+                    // If it's a valid duration, append it to the full note specification.
+                    // The 'ss >> next_token_candidate' already consumed it, so no rewind needed.
+                    full_note_spec += " " + next_token_candidate;
+                }
+                else
+                {
+                    // Not an explicit duration, put the token back into the stream
+                    ss.seekg(current_iss_pos); // Rewind the stream
+                }
+            }
+            // If ss >> next_token_candidate failed (e.g., end of stream),
+            // full_note_spec remains just the first token, which is correct.
+
+            // --- END OF LOOK-AHEAD LOGIC ---
+
+            // Now, parseNoteString receives the complete note specification,
+            // including the explicit duration if one was found and appended.
+            std::string parsed_folderAbbr;
             std::string parsed_noteName;
             char parsed_accidental;
             int parsed_length_for_note;
             int parsed_octave_for_note;
             double parsed_explicitDurationSeconds;
 
-            std::cout << " DEBUG: parseNoteString received '" << current_token << "'" << std::endl; // Debug this full token
+            std::cout << " DEBUG: parseNoteString received '" << full_note_spec << "'" << std::endl;
 
-            if (this->parseNoteString(current_token, parsed_folderAbbr, parsed_noteName, parsed_accidental,
+            if (this->parseNoteString(full_note_spec, parsed_folderAbbr, parsed_noteName, parsed_accidental,
                                       parsed_length_for_note, parsed_octave_for_note, parsed_explicitDurationSeconds,
-                                      currentLength, currentOctave))
+                                      currentLength, currentOctave)) // HOTFIX
             {
                 std::vector<float> noteAudio = m_noteDecoder.getNoteAudio(
-                    parsed_folderAbbr, // Use the folder determined by parseNoteString
+                    parsed_folderAbbr,
                     parsed_noteName,
                     parsed_accidental,
                     parsed_length_for_note,
                     parsed_octave_for_note,
                     parsed_explicitDurationSeconds,
-                    currentTempo);
+                    currentTempo); // HOTFIX
 
+                // Apply volume
                 for (float &sample : noteAudio)
                 {
-                    sample *= currentVolume;
+                    sample *= m_currentVolume;
                 }
-
                 fullAudioOutput.insert(fullAudioOutput.end(), noteAudio.begin(), noteAudio.end());
             }
             else
             {
-                std::cerr << "Error: Could not parse note command '" << current_token << "'. Skipping." << std::endl;
+                std::cerr << "Error: Could not parse note command '" << full_note_spec << "'. Skipping." << std::endl;
             }
         }
-    } // End while loop
-
+    }
     return fullAudioOutput;
 }
 
@@ -919,6 +945,34 @@ std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlFilePa
         }
         else
         { // Note/Sound Command
+
+            std::string full_note_spec = current_token; // Start with the first token (e.g., "X:bass03")
+
+            // --- LOOK-AHEAD LOGIC FOR OPTIONAL EXPLICIT DURATION ---
+            std::string next_token_candidate;
+            std::streampos current_iss_pos = ss.tellg(); // Save current stream position
+
+            // Try to read the next token from the stream
+            if (ss >> next_token_candidate)
+            {
+                // *** USE THE HELPER METHOD HERE ***
+                if (isExplicitDurationToken(next_token_candidate)) // Check if it's a valid explicit duration token
+                {
+                    // If it's a valid duration, append it to the full note specification.
+                    // The 'ss >> next_token_candidate' already consumed it, so no rewind needed.
+                    full_note_spec += " " + next_token_candidate;
+                }
+                else
+                {
+                    // Not an explicit duration, put the token back into the stream
+                    ss.seekg(current_iss_pos); // Rewind the stream
+                }
+            }
+            // If ss >> next_token_candidate failed (e.g., end of stream),
+            // full_note_spec remains just the first token, which is correct.
+
+            // --- END OF LOOK-AHEAD LOGIC ---
+
             pCmd.type = CommandType::NOTE;
             std::string parsed_folderAbbr;
             std::string parsed_noteName;
@@ -927,7 +981,7 @@ std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlFilePa
             int parsed_octave_for_note;
             double parsed_explicitDurationSeconds;
 
-            if (!this->parseNoteString(current_token, parsed_folderAbbr, parsed_noteName, parsed_accidental,
+            if (!this->parseNoteString(full_note_spec, parsed_folderAbbr, parsed_noteName, parsed_accidental,
                                        parsed_length_for_note, parsed_octave_for_note, parsed_explicitDurationSeconds,
                                        currentLength, currentOctave))
             {

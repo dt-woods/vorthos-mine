@@ -11,8 +11,6 @@
 //////////////////////////////////////////////////////////////////////////////
 
 // --- generate_audio function (from previous discussions) ---
-// You MUST place the implementation of generate_audio here or in a separate utility file.
-// For example:
 std::vector<float> generate_audio(const std::vector<float> &sample_data, double sample_rate, double desired_duration)
 {
     std::vector<float> output_audio;
@@ -355,6 +353,11 @@ std::vector<float> NoteDecoder::getNoteAudio(
         std::cout << "Using natural sample duration: " << targetDurationSeconds << "s" << std::endl; // For debugging
     }
 
+    // --- ADD THIS DEBUG LINE ---
+    std::cout << "Calculated target duration for " << folderAbbr << ":" << noteName
+              << " (L=" << length << "): " << targetDurationSeconds << "s" << std::endl;
+    // --- END DEBUG LINE ---
+
     // Ensure target duration is positive
     if (targetDurationSeconds <= 0)
     {
@@ -364,10 +367,47 @@ std::vector<float> NoteDecoder::getNoteAudio(
         return {}; // Return empty audio if duration is invalid
     }
 
-    // 4. Generate the final audio data (looping/cutting)
-    return generate_audio(loadedSample.data, loadedSample.sampleRate, targetDurationSeconds);
-}
+    // Handle looping vs. padding with silence based on instrument type
+    std::vector<float> finalAudioData;
+    size_t numSamplesToGenerate = static_cast<size_t>(targetDurationSeconds * loadedSample.sampleRate);
 
+    // Convert folderAbbr to lowercase for comparison, assuming it's already
+    // lowercased, but just for safety.
+    std::string lowerFolderAbbr = folderAbbr;
+    std::transform(lowerFolderAbbr.begin(), lowerFolderAbbr.end(), lowerFolderAbbr.begin(),
+                   [](unsigned char c)
+                   { return std::tolower(c); });
+
+    // Define which folders should NOT loop, but rather pad with silence
+    bool isOneShotInstrument = (lowerFolderAbbr == "x" || lowerFolderAbbr == "noise" ||
+                                lowerFolderAbbr == "miscellaneous" || lowerFolderAbbr == "sk-5");
+
+    if (isOneShotInstrument)
+    {
+        // For one-shot instruments (drums, effects):
+        // Play the sample once, then pad with silence if desired_duration > sample_length
+        finalAudioData.insert(finalAudioData.end(), loadedSample.data.begin(), loadedSample.data.end());
+
+        if (finalAudioData.size() < numSamplesToGenerate)
+        {
+            // Pad with silence to reach the desired duration
+            finalAudioData.resize(numSamplesToGenerate, 0.0f);
+        }
+        else if (finalAudioData.size() > numSamplesToGenerate)
+        {
+            // Truncate if the sample is longer than desired (less common for drums)
+            finalAudioData.resize(numSamplesToGenerate);
+        }
+    }
+    else // For pitched instruments (impulsewave, squarewave, trianglewave)
+    {
+        // Here, it's generally okay to loop the sample if desired_duration is longer.
+        // So, you can use your existing generate_audio function for these.
+        finalAudioData = generate_audio(loadedSample.data, loadedSample.sampleRate, targetDurationSeconds);
+    }
+
+    return finalAudioData;
+}
 
 // --- loadWavFile Implementation ---
 SampleInfo NoteDecoder::loadWavFile(const std::string &filePath)
