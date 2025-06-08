@@ -663,7 +663,7 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
                 double dummy_explicitDurationSeconds; // This will capture any explicit duration within an individual note,
                                                       // but it will be *ignored* in favor of chord_explicitDurationSeconds.
 
-                std::cout << " DEBUG: parseNoteString received '" << note_str << "'" << std::endl;
+                std::cout << " DEBUG: parseNoteString chord received '" << note_str << "'" << std::endl;
 
                 if (this->parseNoteString(note_str, chord_note_folderAbbr, chord_note_name, chord_note_accidental,
                                           chord_note_length, chord_note_octave, dummy_explicitDurationSeconds,
@@ -748,10 +748,10 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
         } // End of CHORD block
         else
         { // This is a potential Note/Sound Command (e.g., "X:bass03", "tri:C4")
-
-
             // Now, parseNoteString receives the complete note specification,
             // including the explicit duration if one was found and appended.
+            std::string full_note_str = command_type_str + ":" + command_args_str;
+
             std::string parsed_folderAbbr;
             std::string parsed_noteName;
             char parsed_accidental;
@@ -759,9 +759,9 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
             int parsed_octave_for_note;
             double parsed_explicitDurationSeconds;
 
-            std::cout << " DEBUG: parseNoteString received '" << command_args_str << "'" << std::endl;
+            std::cout << " DEBUG: parseNoteString note received '" << full_note_str << "' for folder " << std::endl;
 
-            if (this->parseNoteString(command_args_str, parsed_folderAbbr, parsed_noteName, parsed_accidental,
+            if (this->parseNoteString(full_note_str, parsed_folderAbbr, parsed_noteName, parsed_accidental,
                                       parsed_length_for_note, parsed_octave_for_note, parsed_explicitDurationSeconds,
                                       currentLength, currentOctave)) // HOTFIX
             {
@@ -1017,6 +1017,8 @@ std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlFilePa
         }
         else
         { // Note/Sound Command
+            std::string full_note_str = command_type_str + ":" + command_args_str;
+
             pCmd.type = CommandType::NOTE;
             std::string parsed_folderAbbr;
             std::string parsed_noteName;
@@ -1025,7 +1027,7 @@ std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlFilePa
             int parsed_octave_for_note;
             double parsed_explicitDurationSeconds;
 
-            if (!this->parseNoteString(command_args_str, parsed_folderAbbr, parsed_noteName, parsed_accidental,
+            if (!this->parseNoteString(full_note_str, parsed_folderAbbr, parsed_noteName, parsed_accidental,
                                        parsed_length_for_note, parsed_octave_for_note, parsed_explicitDurationSeconds,
                                        currentLength, currentOctave))
             {
