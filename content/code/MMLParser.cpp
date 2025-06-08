@@ -6,19 +6,18 @@
 #include <iostream>  // For error reporting
 #include <string>    // For std::string::npos, substr etc
 
-// Constructor implementation (MODIFIED)
-// MMLParser constructor implementation (CORRECTED)
+// MMLParser constructor implementation
 MMLParser::MMLParser(const std::string &waveformLibraryPath,
                      double defaultTempoBPM,
                      int defaultOctave,
                      int defaultLength,
                      int defaultVolume)
     // Initialize member variables in the initializer list
-    : m_noteDecoder(waveformLibraryPath), // Initialize the NoteDecoder member here
+    : m_noteDecoder(waveformLibraryPath), // Initialize the NoteDecoder here
       m_currentTempoBPM(defaultTempoBPM),
       m_currentOctave(defaultOctave),
       m_currentLength(defaultLength),
-      m_currentVolume(static_cast<float>(defaultVolume) / 100.0f) //
+      m_currentVolume(static_cast<float>(defaultVolume) / 100.0f)
 {
     std::cout << "MMLParser initialized with waveform library: " << waveformLibraryPath << std::endl;
     std::cout << "Default Tempo: " << m_currentTempoBPM << ", Octave: " << m_currentOctave << ", Length: " << m_currentLength << ", Volume: " << defaultVolume << "%" << std::endl;
@@ -90,27 +89,28 @@ bool MMLParser::parseNoteCommand(
     int &length,
     int &octave,
     double &explicitDurationSeconds,
-    int defaultLength, // New parameter
-    int defaultOctave  // New parameter
+    int defaultLength,
+    int defaultOctave
 ) const
 {
     // Initialize output parameters with passed-in defaults
     noteName = "";
     accidental = ' ';
-    length = defaultLength; // Use default length if not found in command_args_str
-    octave = defaultOctave; // Use default octave if not found in command_args_str
+    // Use default length and octave if not found in command_args_str
+    length = defaultLength;
+    octave = defaultOctave;
     explicitDurationSeconds = 0.0;
 
     std::vector<std::string> parts = splitString(command_args_str, ' ');
 
-    // --- NEW DEBUG PRINT ---
+    // --- DEBUG PRINT ---
     std::cout << "  DEBUG: parseNoteCommand received '" << command_args_str << "'. Split into parts:";
     for (const auto &p : parts)
     {
         std::cout << " ['" << p << "']";
     }
     std::cout << std::endl;
-    // --- END NEW DEBUG PRINT ---
+    // --- END DEBUG PRINT ---
 
     std::string note_spec_part;
     if (!parts.empty())
@@ -123,7 +123,7 @@ bool MMLParser::parseNoteCommand(
         return false;
     }
 
-    // ... (Existing explicit duration parsing remains the same) ...
+    // Explicit duration parsing
     if (parts.size() > 1)
     {
         std::string duration_str = parts[1];
@@ -138,7 +138,7 @@ bool MMLParser::parseNoteCommand(
         }
     }
 
-    // ... (Existing special handling for non-pitched instruments remains the same) ...
+    // Special handling for non-pitched instruments
     if (folderAbbr == "X" || folderAbbr == "noise" || folderAbbr == "miscellaneous" || folderAbbr == "sk-5")
     {
         noteName = note_spec_part;
@@ -146,12 +146,12 @@ bool MMLParser::parseNoteCommand(
         return true;
     }
 
-    // --- Complex parsing for pitched instruments (MODIFIED to potentially override defaults) ---
+    // Complex parsing for pitched instruments
+    // (MODIFIED to potentially override defaults)
     std::string current_note_spec_remaining = note_spec_part;
     size_t current_pos = 0;
 
     // 1. Extract baseNote (A-G)
-    // ... (This part remains the same) ...
     if (current_pos < current_note_spec_remaining.length() && std::isalpha(current_note_spec_remaining[current_pos]))
     {
         noteName = current_note_spec_remaining.substr(current_pos, 1);
@@ -171,7 +171,6 @@ bool MMLParser::parseNoteCommand(
     }
 
     // 2. Look for accidental (+ or -)
-    // ... (This part remains the same) ...
     if (current_pos < current_note_spec_remaining.length())
     {
         char possible_accidental = current_note_spec_remaining[current_pos];
@@ -210,9 +209,11 @@ bool MMLParser::parseNoteCommand(
         if (current_pos < current_note_spec_remaining.length() && std::isdigit(current_note_spec_remaining[current_pos]))
         {
             std::string octave_str = current_note_spec_remaining.substr(current_pos, 1); // Only expecting single digit octave
-            int parsedOctave = parseInt(octave_str, -1);                                 // Use -1 as sentinel for invalid
+            // Use -1 as sentinel for invalid
+            int parsedOctave = parseInt(octave_str, -1);
             if (parsedOctave >= 0)
-            {                          // Assuming valid octaves are non-negative
+            {
+                // Assuming valid octaves are non-negative
                 octave = parsedOctave; // OVERRIDE DEFAULT OCTAVE
             }
             else
@@ -229,8 +230,8 @@ bool MMLParser::parseNoteCommand(
     }
     // If 'o' was not found, 'octave' remains defaultOctave.
 
-    // 5. Final check: ensure no unparsed characters remain in the note_spec_part
-    // ... (This part remains the same) ...
+    // 5. Final check: ensure no unparsed characters remain in
+    //    the note_spec_part
     if (current_pos < current_note_spec_remaining.length() && !std::isspace(current_note_spec_remaining[current_pos]))
     {
         std::cerr << "Warning: Unrecognized characters '" << current_note_spec_remaining.substr(current_pos)
@@ -240,65 +241,72 @@ bool MMLParser::parseNoteCommand(
     return true;
 }
 
-
-// --- NEW parseNoteString Implementation ---
+// parseNoteString Implementation (MODIFIED)
 bool MMLParser::parseNoteString(const std::string &fullNoteString,
                                 std::string &folderAbbr,
-                                std::string &noteName,
-                                char &accidental,
-                                int &length_for_note,
-                                int &octave_for_note,
+                                std::string &noteName, // This will be the full drum name if X folder
+                                char &accidental,      // Unused for non-pitched, but initialized
+                                int &length_for_note,  // Default, unused for non-pitched, but initialized
+                                int &octave_for_note,  // Default, unused for non-pitched, but initialized
                                 double &explicitDurationSeconds,
                                 int defaultLength,
                                 int defaultOctave)
 {
+    // Initialize output parameters
     noteName = "";
-    accidental = ' ';
-    length_for_note = defaultLength; // Default to current MML length
-    octave_for_note = defaultOctave; // Default to current MML octave
+    accidental = ' '; // Initialize to a default non-accidental char
+    length_for_note = defaultLength;
+    octave_for_note = defaultOctave;
     explicitDurationSeconds = 0.0;
+    folderAbbr = ""; // Initialize folderAbbr
 
-    std::string temp_note_str = fullNoteString;
+    std::string temp_note_str = fullNoteString; // e.g., "X:bass03" or "sqr:C4 0.5s"
 
-    // Check for explicit folder (e.g., "sqr:C4", "tri:G#3")
+    // 1. Extract folder abbreviation (e.g., "X", "sqr", "tri")
     size_t colon_pos = temp_note_str.find(':');
     if (colon_pos != std::string::npos)
     {
         folderAbbr = temp_note_str.substr(0, colon_pos);
-        temp_note_str = temp_note_str.substr(colon_pos + 1); // Remaining part after folder
+        temp_note_str = temp_note_str.substr(colon_pos + 1); // Remaining part: "bass03" or "C4 0.5s"
     }
     else
     {
-        folderAbbr = "sqr"; // Default folder if not specified
+        // If no folder prefix, use a default (as per your parseMML logic)
+        folderAbbr = "sqr";
     }
 
-    // Check for explicit duration (e.g., "C4 0.5s")
+    // Convert folderAbbr to lowercase for case-insensitive comparison
+    std::transform(folderAbbr.begin(), folderAbbr.end(), folderAbbr.begin(),
+                   [](unsigned char c)
+                   { return std::tolower(c); });
+
+    // 2. Extract explicit duration if present (e.g., "C4 0.5s" -> "0.5s")
     size_t space_pos = temp_note_str.find(' ');
     if (space_pos != std::string::npos)
     {
         std::string duration_part = temp_note_str.substr(space_pos + 1);
-        temp_note_str = temp_note_str.substr(0, space_pos); // Note part before space
+        temp_note_str = temp_note_str.substr(0, space_pos); // Note part before space: "C4" or "bass03"
 
         if (duration_part.length() > 1 && duration_part.back() == 's')
         {
             explicitDurationSeconds = parseDouble(duration_part.substr(0, duration_part.length() - 1));
             if (explicitDurationSeconds <= 0)
             {
-                std::cerr << "Warning: Invalid explicit duration '" << duration_part << "' for note '" << fullNoteString << "'. Ignoring explicit duration." << std::endl;
-                explicitDurationSeconds = 0.0; // Reset if invalid
+                std::cerr << "Warning: Invalid explicit duration '" << duration_part
+                          << "' for note '" << fullNoteString << "'. Ignoring explicit duration." << std::endl;
+                explicitDurationSeconds = 0.0;
             }
         }
         else
         {
-            // Handle explicit length values if needed here (e.g., C4L8) - currently done by just a number
-            // For now, assume a trailing number without 's' is part of length/octave parsing
-            std::cerr << "Warning: Unrecognized duration format '" << duration_part << "' for note '" << fullNoteString << "'. Ignoring." << std::endl;
+            std::cerr << "Warning: Unrecognized duration format '" << duration_part
+                      << "' for note '" << fullNoteString << "'. Ignoring explicit duration." << std::endl;
         }
     }
 
-    // Trim remaining temp_note_str (e.g., "C#4" or "C")
-    temp_note_str.erase(0, temp_note_str.find_first_not_of(" \t\n\r")); // Trim leading whitespace
-    temp_note_str.erase(temp_note_str.find_last_not_of(" \t\n\r") + 1); // Trim trailing whitespace
+    // Trim any remaining whitespace from the main note/sound string
+    temp_note_str.erase(0, temp_note_str.find_first_not_of(" \t\n\r\f\v"));
+    temp_note_str.erase(temp_note_str.find_last_not_of(" \t\n\r\f\v") + 1);
 
     if (temp_note_str.empty())
     {
@@ -306,25 +314,40 @@ bool MMLParser::parseNoteString(const std::string &fullNoteString,
         return false;
     }
 
-    // Extract note name, accidental, and octave
-    size_t i = 0;
-    char base_note = temp_note_str[i];
-    if (!((base_note >= 'A' && base_note <= 'G') || (base_note >= 'a' && base_note <= 'g')))
+    // --- CRITICAL MODIFICATION: Special handling for non-pitched instruments (like 'X') ---
+    // If the folder abbreviation is one of the non-pitched types,
+    // the entire 'temp_note_str' is the sound's name (e.g., "bass03", "snare01").
+    if (folderAbbr == "x" || folderAbbr == "noise" || folderAbbr == "miscellaneous" || folderAbbr == "sk-5")
     {
-        std::cerr << "Error: Invalid base note '" << base_note << "' in '" << fullNoteString << "'" << std::endl;
+        noteName = temp_note_str; // The entire remaining string is the drum/sound ID
+        // For non-pitched instruments, 'accidental', 'length', 'octave' are not relevant
+        // and will retain their default values/initializations.
+        return true; // Successfully parsed a non-pitched sound
+    }
+
+    // --- Original logic for PITCHED notes (A-G, accidentals, octave) ---
+    // This section is only reached if it's NOT a non-pitched instrument folder.
+
+    size_t i = 0;
+    char base_note_char = temp_note_str[i];
+    if (!((base_note_char >= 'A' && base_note_char <= 'G') || (base_note_char >= 'a' && base_note_char <= 'g')))
+    {
+        // This error should now only trigger for truly invalid pitched note names
+        std::cerr << "Error: Invalid base note '" << base_note_char
+                  << "' in '" << fullNoteString << "'" << std::endl;
         return false;
     }
-    noteName = std::toupper(base_note); // Convert to uppercase for consistency
+    noteName = std::string(1, std::toupper(base_note_char)); // Convert to uppercase for consistency
     i++;
 
-    // Check for accidental
+    // Check for accidental (+, -, #, b)
     if (i < temp_note_str.length() && (temp_note_str[i] == '+' || temp_note_str[i] == '-' || temp_note_str[i] == '#' || temp_note_str[i] == 'b'))
     {
         accidental = temp_note_str[i];
         if (accidental == '+')
-            accidental = '#'; // Normalize + to #
+            accidental = '#'; // Normalize '+' to '#'
         if (accidental == '-')
-            accidental = 'b'; // Normalize - to b
+            accidental = 'b'; // Normalize '-' to 'b'
         i++;
     }
 
@@ -337,11 +360,15 @@ bool MMLParser::parseNoteString(const std::string &fullNoteString,
             octave_str += temp_note_str[i];
             i++;
         }
-        octave_for_note = parseInt(octave_str);
-        // Basic validation for octave range
-        if (octave_for_note < 0 || octave_for_note > 8)
+        // Use parseInt helper for robust conversion
+        int parsed_octave = parseInt(octave_str, -1); // Use -1 as sentinel for invalid
+        if (parsed_octave >= 0)                       // Assuming valid octaves are non-negative
         {
-            std::cerr << "Warning: Explicit octave " << octave_for_note << " in '" << fullNoteString << "' is outside typical range (0-8). Using " << defaultOctave << "." << std::endl;
+            octave_for_note = parsed_octave;
+        }
+        else
+        {
+            std::cerr << "Warning: Invalid explicit octave in '" << fullNoteString << "'. Using default octave." << std::endl;
             octave_for_note = defaultOctave; // Fallback to default if invalid
         }
     }
@@ -351,24 +378,18 @@ bool MMLParser::parseNoteString(const std::string &fullNoteString,
         octave_for_note = defaultOctave;
     }
 
-    // Extract length (if present, e.g., C4L8 or C4/8) - This part needs careful thought
-    // For now, we'll assume length is handled by MML's LENGTH command or explicit duration.
-    // If you want per-note lengths like "C4/8", this logic needs to be added here.
-    // Given the current MML spec, it's `LENGTH:8 sqr:C` or `sqr:C 0.5s`
-
-    // Check for unparsed characters
+    // Check for any remaining unrecognized characters
     if (i < temp_note_str.length())
     {
-        // This is where "unrecognized characters 'e' at end of note specification in 'be'" comes from
         std::cerr << "Warning: Unrecognized characters '" << temp_note_str.substr(i)
                   << "' at end of note specification in '" << fullNoteString << "'" << std::endl;
-        // This is usually a parsing error.
     }
 
-    // Length is taken from `defaultLength` unless explicit duration is used.
-    length_for_note = defaultLength;
+    // length_for_note is set by defaultLength at the start and is not parsed within this function
+    // for pitched notes, unless explicit length syntax like C4/8 or C4L8 is added here.
+    // Based on your MML, length is changed by the global LENGTH command.
 
-    return true;
+    return true; // Successfully parsed a pitched note
 }
 
 
@@ -422,14 +443,14 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
     // --- Apply comment stripping here ---
     std::string cleanedMMLString = stripComments(mmlString);
 
-    // --- CRITICAL CHANGE HERE: Use std::stringstream for robust tokenization ---
+    // --- Use std::stringstream for robust tokenization ---
     std::stringstream ss(cleanedMMLString);
     std::string current_token;
 
-    // The loop now correctly extracts tokens separated by any whitespace (including newlines)
+    // The loop now correctly extracts tokens separated by any whitespace
+    // (including newlines)
     while (ss >> current_token)
     { // Loop advances token automatically
-        // No more 'i' index or manual 'i++' needed.
 
         std::string command_type_str;
         std::string command_args_str;
@@ -442,10 +463,10 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
         }
         else
         {
-            // If no colon, assume it's a note with default folder (e.g., "C4")
-            // This logic should match what you have in debugParseMML for notes without explicit folders
-            // For example:
-            command_type_str = "sqr"; // Default to squarewave folder if no colon
+            // Default to squarewave folder if no colon
+            command_type_str = "sqr";
+            // This is the problem spot for notes without explicit folders.
+            // The current MML format always uses folder:note, so this path may not be hit.
             command_args_str = current_token;
         }
 
@@ -466,7 +487,6 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
             {
                 std::cerr << "Warning: Invalid tempo value '" << command_args_str << "'. Using current tempo." << std::endl;
             }
-            // No 'continue;' or 'i++;' needed here, loop handles next token automatically
         }
         else if (command_type_str == "octave")
         {
@@ -610,7 +630,7 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
             } // End of loop through note_strings
 
             std::cout << "DEBUG: After parsing all chord notes - individualNoteAudios count: " << individualNoteAudios.size()
-                      << ", calculated chordDurationSamples: " << chordDurationSamples << std::endl; // ADD THIS LINE
+                      << ", calculated chordDurationSamples: " << chordDurationSamples << std::endl;
 
             // --- Mixing Audio Samples ---
             if (chordDurationSamples > 0 && !individualNoteAudios.empty())
@@ -698,7 +718,7 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
 }
 
 
-// --- NEW: stripComments function implementation ---
+// --- stripComments function implementation ---
 std::string MMLParser::stripComments(const std::string &mmlStringWithComments)
 {
     std::string cleanedMML;
@@ -833,7 +853,6 @@ std::vector<ParsedCommand> MMLParser::debugParseMML(const std::string &mmlFilePa
         }
         else if (command_type_str == "r")
         {
-            // ... (rest handling remains the same) ...
             ParsedRest parsedRestData;
             parsedRestData.isExplicitDuration = false;
             parsedRestData.length = 0;

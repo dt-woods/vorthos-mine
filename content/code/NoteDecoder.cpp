@@ -92,7 +92,7 @@ std::string NoteDecoder::buildWaveformFilePath(
     // Use a stringstream for easy number to string conversion for variants
     std::stringstream ss;
 
-    if (folderAbbr == "X")
+    if (folderAbbr == "x")   // HOTFIX: all folders are lowercase
     { // Casio Drums
         // Naming: DRUMS-<style><variant>.wav
         std::string drumStyle = noteName;
@@ -264,7 +264,7 @@ std::string NoteDecoder::getFullFolderPath(const std::string &folderAbbr) const
         return "squarewave";
     if (folderAbbr == "tri")
         return "trianglewave";
-    if (folderAbbr == "X")
+    if (folderAbbr == "x")   // HOTFIX: all folder names are lowercase
         return "casio-drums";
     // For "noise", "miscellaneous", "sk-5", the abbreviation is the full name
     return folderAbbr;
