@@ -264,7 +264,125 @@ R:1 R:1 R:1 R:1
 #
 # FUNCTIONS
 #
-def get_preceding_word(text: str, index: int) -> str:
+def remove_comments(text):
+    """
+    Removes comments from a string. A comment is defined as everything that
+    comes after the first semicolon (;) on a given line. All other formatting,
+    including leading/trailing whitespace on a line (before the comment) and
+    newline characters, is preserved.
+
+    Args:
+        text: The input string, which may contain multiple lines and comments.
+
+    Returns:
+        The string with all comments removed.
+
+    Raises:
+        TypeError: If the input 'text' is not a string.
+    """
+    if not isinstance(text, str):
+        raise TypeError("Input must be a string.")
+
+    # Split the input string into individual lines.
+    # .splitlines() handles different newline characters ('\n', '\r\n', '\r')
+    # and does not include empty strings for blank lines, or for a final newline.
+    lines = text.splitlines()
+
+    processed_lines = []
+    for line in lines:
+        # Find the index of the first semicolon on the current line.
+        comment_start_index = line.find(';')
+
+        if comment_start_index != -1:
+            # If a semicolon is found, take only the part of the line
+            # that comes before the semicolon. This preserves any spaces
+            # or other characters immediately preceding the semicolon.
+            processed_lines.append(line[:comment_start_index])
+        else:
+            # If no semicolon is found on the line, the entire line is not a comment.
+            # So, keep the line as is, preserving all its formatting.
+            processed_lines.append(line)
+
+    # Join the processed lines back together using newline characters.
+    # Since .splitlines() removes the newline characters, we re-add them.
+    # This correctly reconstructs the multi-line string.
+    return '\n'.join(processed_lines)
+
+
+def get_value_after_colon_until_next_command(text, colon_index):
+    """
+    Extracts the value following a colon at 'colon_index'. The extraction
+    stops at the beginning of the next MML command (e.g., ' X:', ' R:', ' tri:'),
+    which is identified by a space followed by a word and a colon.
+    If no such next command pattern is found, the extraction goes to the earliest of:
+    a newline character, a comment character (;), or the end of the string.
+
+    Args:
+        text: The input MML string or line.
+        colon_index: The index of the colon from which to start extracting the value.
+                     The returned substring starts from colon_index + 1.
+
+    Returns:
+        The extracted value string. Returns an empty string if no value follows
+        the colon or if the 'colon_index' is invalid or at the end of the string.
+
+    Raises:
+        TypeError: If 'text' is not a string or 'colon_index' is not an integer.
+        ValueError: If 'colon_index' is out of bounds or does not point to a colon.
+    """
+    if not isinstance(text, str):
+        raise TypeError("Input 'text' must be a string.")
+    if not isinstance(colon_index, int):
+        raise TypeError("Input 'colon_index' must be an integer.")
+
+    # Validate colon_index: it must be within string bounds and point to a colon.
+    if not (0 <= colon_index < len(text) and text[colon_index] == ':'):
+        raise ValueError(
+            f"Invalid colon_index {colon_index}. "
+            f"It must be within bounds (0 to {len(text)-1}) and point to a ':' character. "
+            f"String: '{text}'"
+        )
+
+    # The value starts immediately after the colon
+    value_start_index = colon_index + 1
+
+    # If the colon is the last character in the string, there's no value to extract.
+    if value_start_index >= len(text):
+        return ""
+
+    potential_end_indices = []
+
+    # Regex to find the start of the next MML command pattern:
+    # \s     - A single whitespace character
+    # \w+    - One or more word characters (alphanumeric + underscore), for the command name
+    # :      - A literal colon
+    next_command_pattern = re.compile(r'\s\w+:')
+
+    # Search for this pattern starting from `value_start_index`.
+    match = next_command_pattern.search(text, pos=value_start_index)
+    if match:
+        potential_end_indices.append(match.start())
+
+    # Find next newline
+    next_newline_idx = text.find('\n', value_start_index)
+    if next_newline_idx != -1:
+        potential_end_indices.append(next_newline_idx)
+
+    # Find next comment start (;)
+    next_comment_idx = text.find(';', value_start_index)
+    if next_comment_idx != -1:
+        potential_end_indices.append(next_comment_idx)
+
+    # Determine the actual end index based on the earliest found separator
+    value_end_index = len(text) # Default to end of string
+    if potential_end_indices:
+        value_end_index = min(potential_end_indices)
+
+    # Extract the substring and strip any leading/trailing whitespace
+    return text[value_start_index:value_end_index].strip()
+
+
+def get_preceding_word(text, index):
     """
     Returns the word that immediately precedes the given index in a string.
     The function looks backward from the index until it encounters a space,
@@ -308,7 +426,7 @@ def get_preceding_word(text: str, index: int) -> str:
     return word
 
 
-def find_colon_indices_loop(s: str) -> list[int]:
+def find_colon_indices_loop(s):
     """
     Finds all indices in a string where the character is a colon (:).
 
@@ -442,14 +560,34 @@ def calculate_mml_duration_v4(mml_content):
 
 # --- Test with the provided MMLs again ---
 # (Using the same MML content variables from the previous response)
-my_colons = find_colon_indices_loop(rhythm_mml)
+my_txt = remove_comments(rhythm_mml)
+my_colons = find_colon_indices_loop(my_txt)
 print("Found %d colons in rhythm.mml" % len(my_colons))
-_word = get_preceding_word(rhythm_mml, my_colons[0])
-print("First command: %s" % _word.lower())
-_word = get_preceding_word(rhythm_mml, my_colons[1])
-print("Second command: %s" % _word.lower())
-_word = get_preceding_word(rhythm_mml, my_colons[2])
-print("Third command: %s" % _word.lower())
 
-# TODO:
-# - if 'length' is the word, get the string after.
+my_lens = {}
+cur_len = 4
+
+for i in range(1,10):
+    _idx = my_colons[i]
+    _word = get_preceding_word(my_txt, _idx)
+    _after = get_value_after_colon_until_next_command(my_txt, _idx)
+    print(f"{i}th command: {_word.lower()}; after: {_after}")
+
+    if _word == "length":
+        # Length redefinition
+        cur_len = int(_after)
+        print(f"Setting length to {cur_len}")
+    elif _word in ["tempo", "octave", "volume"]:
+        continue
+    elif _word == "r":
+        # Rest must have length
+        _len = int(_after)
+        if _len in my_lens:
+            my_lens[_len] += 1
+        else:
+            my_lens[_len] = 1
+    else:
+        # TODO: look for explicit duration in CHORD or note; else,
+        # count += 1 for cur_len. Lastly, sum across the counts in
+        # my_lens.
+        pass
