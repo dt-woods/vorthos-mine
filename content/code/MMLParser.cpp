@@ -759,7 +759,7 @@ std::vector<float> MMLParser::parseMML(const std::string &mmlString)
             int parsed_octave_for_note;
             double parsed_explicitDurationSeconds;
 
-            std::cout << " DEBUG: parseNoteString note received '" << full_note_str << "' for folder " << std::endl;
+            std::cout << " DEBUG: parseNoteString note received '" << full_note_str << "'" << std::endl;
 
             if (this->parseNoteString(full_note_str, parsed_folderAbbr, parsed_noteName, parsed_accidental,
                                       parsed_length_for_note, parsed_octave_for_note, parsed_explicitDurationSeconds,
